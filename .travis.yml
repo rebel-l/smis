@@ -1,0 +1,21 @@
+language: go
+
+go:
+  - 1.x
+
+git:
+  depth: 1
+
+before_install:
+  - go get -u github.com/alecthomas/gometalinter
+  - gometalinter --install
+
+before_script:
+  - chmod 755 ./scripts/tools/*
+
+script:
+  - gometalinter --config=gometalinter.json
+  - go test -v -cover -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
