@@ -41,7 +41,11 @@ func (s Service) RegisterEndpoint(path, method string, f func(http.ResponseWrite
 
 // RegisterFileServer registers a file server to provide static files
 func (s Service) RegisterFileServer(path, method, filepath string) (*mux.Route, error) {
-	return s.Router.PathPrefix(path).Handler(http.StripPrefix(path, http.FileServer(http.Dir(filepath)))).Methods(method), nil
+	return s.Router.
+			PathPrefix(path).
+			Handler(http.StripPrefix(path, http.FileServer(http.Dir(filepath)))).
+			Methods(method),
+		nil
 }
 
 // ListenAndServe registers the catch all route and starts the server
