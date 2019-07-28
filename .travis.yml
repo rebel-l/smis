@@ -6,15 +6,13 @@ go:
 git:
   depth: 1
 
-before_install:
-  - go get -u github.com/alecthomas/gometalinter
-  - gometalinter --install
+#before_install:
 
 before_script:
   - chmod 755 ./scripts/tools/*
 
 script:
-  - gometalinter --config=gometalinter.json
+  - golangci-lint run -v
   - go test -v -cover -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 after_success:
