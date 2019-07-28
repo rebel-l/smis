@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 
 function showHelp() {
-echo
-echo "This script installs the basic tools you need (go is required) to start development of this project."
-echo "It doesn't expect any parameter and installs gometalinters, goconvey and git hooks."
-echo
-echo "usage: ./scripts/tools/setup.sh [options]"
-echo
-echo "Options"
-echo "-h, -?    shows this help"
-echo
+  echo
+  echo "This script installs the basic tools you need (go is required) to start development of this project."
+  echo "It doesn't expect any parameter and installs gometalinters, goconvey and git hooks."
+  echo
+  echo "usage: ./scripts/tools/setup.sh [options]"
+  echo
+  echo "Options"
+  echo "-h, -?    shows this help"
+  echo
 }
 
 while getopts "h?" opt; do
-case "$opt" in
-h|\?)
-showHelp
-exit 0
-;;
-esac
+  case "$opt" in
+    h|\?)
+    showHelp
+    exit 0
+    ;;
+  esac
 done
 
 echo
@@ -31,18 +31,17 @@ go version
 EXIT_CODE=$?
 if [[ ${EXIT_CODE} != 0 ]]
 then
-echo
-echo -en "\E[40;31m\033[1mGo is not installed! Please download and install Go from https://golang.org/dl/ before executing this script\033[0m"
-echo
-echo
-exit ${EXIT_CODE}
+  echo
+  echo -en "\E[40;31m\033[1mGo is not installed! Please download and install Go from https://golang.org/dl/ before executing this script\033[0m"
+  echo
+  echo
+  exit ${EXIT_CODE}
 fi
 
-# install gometalinters
-echo -en "\E[40;34m\033[1mInstall: gometalinter\033[0m"
+# install golangci-lint
+echo -en "\E[40;34m\033[1mInstall: golangci-lint\033[0m"
 echo
-go get -u github.com/alecthomas/gometalinter
-gometalinter -i
+go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
 # install goconvey
 echo -en "\E[40;34m\033[1mInstall: goconvey\033[0m"
