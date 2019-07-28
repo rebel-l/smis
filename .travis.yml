@@ -9,9 +9,6 @@ git:
 before_install:
   - go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
-before_script:
-  - chmod 755 ./scripts/tools/*
-
 script:
   - golangci-lint run -v
   - go test -v -cover -race -coverprofile=coverage.txt -covermode=atomic ./...
