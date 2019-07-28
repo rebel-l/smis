@@ -6,7 +6,8 @@ go:
 git:
   depth: 1
 
-#before_install:
+before_install:
+  - go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
 before_script:
   - chmod 755 ./scripts/tools/*
