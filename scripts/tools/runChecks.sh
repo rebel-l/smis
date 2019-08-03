@@ -41,7 +41,7 @@ done
 echo
 echo -en "\E[40;35m\033[1mExecute linters\033[0m"
 echo
-golangci-lint run ${FAST} -v
+golangci-lint run ${FAST}
 EXIT_CODE=$?
 if [[ ${EXIT_CODE} != 0 ]]
 then

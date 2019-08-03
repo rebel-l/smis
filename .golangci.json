@@ -1,36 +1,22 @@
 {
-  "run": {
-    "tests": true
+  "issues": {
+    "exclude-use-default": false,
+    "max-issues-per-linter": 0,
+    "max-same-issues": 0
   },
   "linters": {
-    "enable": [
-      "bodyclose",
-      "deadcode",
-      "dupl",
-      "errcheck",
-      "gochecknoinits",
-      "goconst",
-      "gocritic",
-      "gocyclo",
-      "golint",
-      "gosec",
-      "gosimple",
-      "govet",
-      "ineffassign",
-      "interfacer",
-      "lll",
-      "maligned",
-      "misspell",
-      "nakedret",
-      "prealloc",
-      "staticcheck",
-      "structcheck",
-      "stylecheck",
-      "typecheck",
-      "unconvert",
-      "unparam",
-      "unused",
-      "varcheck"
+    "enable-all": true,
+    "disable": [
+      "gochecknoglobals",
+      "scopelint"
     ]
+  },
+  "run": {
+    "deadline": "5m",
+    "skip-dirs": [
+      "reports",
+      "scripts"
+    ],
+    "tests": true
   }
 }
