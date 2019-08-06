@@ -2,13 +2,66 @@ package smis
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/rebel-l/go-utils/slice"
 
 	"github.com/gorilla/mux"
 )
+
+func TestNewService(t *testing.T) {
+	testcases := []struct {
+		name   string
+		server *http.Server
+		log    logrus.FieldLogger
+		err    error
+	}{
+		{
+			name: "server and log nil",
+			err:  fmt.Errorf("server should not be nil"),
+		},
+		{
+			name: "server nil",
+			log:  logrus.New(),
+			err:  fmt.Errorf("server should not be nil"),
+		},
+		{
+			name:   "log nil",
+			server: &http.Server{},
+			err:    fmt.Errorf("log should not be nil"),
+		},
+		{
+			name:   "server and log given",
+			log:    logrus.New(),
+			server: &http.Server{},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			_, err := NewService(testcase.server, testcase.log)
+
+			if testcase.err == nil && err != nil {
+				t.Errorf("expected no error but got '%s'", err.Error())
+				return
+			}
+
+			if testcase.err != nil && err == nil {
+				t.Errorf("expected '%s' but got no error", testcase.err.Error())
+				return
+			}
+
+			if testcase.err != nil && err != nil && testcase.err.Error() != err.Error() {
+				t.Errorf("expected error message '%s' but got '%s'", testcase.err.Error(), err.Error())
+			}
+		})
+	}
+}
 
 func TestService_RegisterEndpoint(t *testing.T) {
 	testcases := []struct {
@@ -28,49 +81,49 @@ func TestService_RegisterEndpoint(t *testing.T) {
 		},
 		{
 			name:   "method delete",
-			path:   "/health",
+			path:   "/ping",
 			method: http.MethodDelete,
 		},
 		{
 			name:   "method get",
-			path:   "/health",
+			path:   "/route",
 			method: http.MethodGet,
 		},
 		{
 			name:   "method head",
-			path:   "/health",
+			path:   "/route/sub",
 			method: http.MethodHead,
 		},
 		{
 			name:   "method options",
-			path:   "/health",
+			path:   "/route/:param",
 			method: http.MethodOptions,
 		},
 		{
 			name:   "method patch",
-			path:   "/health",
+			path:   "/something",
 			method: http.MethodPatch,
 		},
 		{
 			name:   "method post",
-			path:   "/health",
+			path:   "/else",
 			method: http.MethodPost,
 		},
 		{
 			name:   "method put",
-			path:   "/health",
+			path:   "/to",
 			method: http.MethodPut,
 		},
 		{
 			name:   "method trace",
-			path:   "/health",
+			path:   "/test",
 			method: http.MethodTrace,
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			service := Service{Router: mux.NewRouter()}
+			service := &Service{Router: mux.NewRouter()}
 			route, err := service.RegisterEndpoint(
 				testcase.path,
 				testcase.method,
@@ -95,15 +148,94 @@ func TestService_RegisterEndpoint(t *testing.T) {
 			}
 
 			// check registered endpoints
-			if registeredEndpoints.KeyNotExists(testcase.path) {
-				t.Errorf("path '%s' is not added to registred endpoints", testcase.path)
+			path := extractPath(testcase.path)
+			if service.registeredEndpoints.KeyNotExists(path) {
+				t.Errorf("path '%s' is not added to registred endpoints", path)
 			}
 
-			if registeredEndpoints.GetValuesForKey(testcase.path).IsNotIn(testcase.method) {
-				t.Errorf("method '%s' is not set added to registered endpoints", testcase.method)
+			if service.registeredEndpoints.GetValuesForKey(path).IsNotIn(testcase.method) {
+				t.Errorf("method '%s' is not set added to registered endpoints: %v", testcase.method, service.registeredEndpoints)
 			}
 		})
 	}
+}
+
+func TestService_ServeHTTP(t *testing.T) {
+	testcases := []struct {
+		name    string
+		path    string
+		method  string
+		request *http.Request
+	}{
+		{
+			name:    "root path / get",
+			path:    "/",
+			method:  http.MethodGet,
+			request: httptest.NewRequest(http.MethodPut, "/", nil),
+		},
+		{
+			name:    "path with param",
+			path:    "/route/:param",
+			method:  http.MethodPut,
+			request: httptest.NewRequest(http.MethodGet, "/route/12358", nil),
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			service := &Service{Router: mux.NewRouter(), Log: logrus.New()}
+			route, err := service.RegisterEndpoint(testcase.path, testcase.method, func(writer http.ResponseWriter, request *http.Request) {
+				_, err := io.WriteString(writer, "We should not get this response")
+				if err != nil {
+					t.Fatalf("failed to writs response: %s", err)
+				}
+			})
+
+			if err != nil {
+				t.Fatalf("failed to register endpoint: %s", err)
+			}
+			t.Log(route)
+			t.Log(service.registeredEndpoints)
+
+			w := httptest.NewRecorder()
+			service.ServeHTTP(w, testcase.request)
+			resp := w.Result()
+			t.Log(resp)
+			t.Log(route.GetPathTemplate())
+			//service.Router.NotFoundHandler
+		})
+	}
+}
+
+func Test_NotFound(t *testing.T) {
+	service, err := NewService(&http.Server{}, logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/something", nil)
+	service.Router.ServeHTTP(w, req)
+	t.Log(w.Result())
+}
+
+func Test_NotAllowed(t *testing.T) {
+	service, err := NewService(&http.Server{}, logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	_, err = service.RegisterEndpoint("/path", http.MethodGet, func(writer http.ResponseWriter, request *http.Request) {
+		_, err := io.WriteString(writer, "We should not get this response")
+		if err != nil {
+			t.Fatalf("failed to writs response: %s", err)
+		}
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/path", nil)
+	service.Router.ServeHTTP(w, req)
+	t.Log(w.Result())
 }
 
 func TestExtractPath(t *testing.T) {
@@ -136,6 +268,11 @@ func TestExtractPath(t *testing.T) {
 			name:  "two slashes with parameter",
 			given: "/ping/:id",
 			want:  "/ping",
+		},
+		{
+			name:  "two slashes with parameter 2",
+			given: "/route/:param",
+			want:  "/route",
 		},
 		{
 			name:  "two slashes with ending slash",
