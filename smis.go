@@ -4,20 +4,18 @@ package smis
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
 
-	"github.com/rebel-l/go-utils/mapof"
 	"github.com/rebel-l/go-utils/slice"
 
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	MiddlewareChainPublic     = "public"
-	MiddlewareChainRestricted = "restricted"
+//MiddlewareChainPublic     = "public"
+//MiddlewareChainRestricted = "restricted"
 )
 
 // Server is an interface to describe how to serve endpoints
@@ -27,16 +25,16 @@ type Server interface {
 
 // Service represents the fields necessary for a service
 type Service struct {
-	Log                 logrus.FieldLogger
-	Router              *mux.Router
-	SubRouters          map[string]*mux.Router
-	Server              Server
-	MiddlewareChain     map[string][]mux.MiddlewareFunc
-	registeredEndpoints mapof.StringSliceMap
+	Log    logrus.FieldLogger
+	Router *mux.Router
+	//SubRouters          map[string]*mux.Router
+	Server Server
+	//MiddlewareChain     map[string][]mux.MiddlewareFunc
+	//registeredEndpoints mapof.StringSliceMap
 }
 
 // NewService returns an initialized service struct
-func NewService(server *http.Server, log logrus.FieldLogger) (*Service, error) {
+func NewService(server Server, log logrus.FieldLogger) (*Service, error) {
 	if server == nil {
 		return nil, fmt.Errorf("server should not be nil")
 	}
@@ -56,6 +54,7 @@ func NewService(server *http.Server, log logrus.FieldLogger) (*Service, error) {
 	return service, nil
 }
 
+/*
 func (s *Service) AddMiddleware(chain string, middleware mux.MiddlewareFunc) {
 	s.MiddlewareChain[chain] = append(s.MiddlewareChain[chain], middleware)
 }
@@ -67,21 +66,17 @@ func (s *Service) AddMiddlewareForPublicChain(middleware mux.MiddlewareFunc) {
 func (s *Service) AddMiddlewareForRestrictedChain(middleware mux.MiddlewareFunc) {
 	s.AddMiddleware(MiddlewareChainRestricted, middleware)
 }
+*/
 
 // RegisterEndpoint registers a handler at the router for the given method and path.
 // In case the method is not known an error is return, otherwise a *Route.
-func (s *Service) RegisterEndpoint(path, method string, f func(http.ResponseWriter, *http.Request)) (*mux.Route, error) {
+func (s *Service) RegisterEndpoint(
+	path, method string, f func(http.ResponseWriter, *http.Request)) (*mux.Route, error) {
 
 	methods := getAllowedHTTPMethods()
 	if methods.IsNotIn(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
-
-	if s.registeredEndpoints == nil {
-		s.registeredEndpoints = make(mapof.StringSliceMap)
-	}
-
-	s.registeredEndpoints.AddUniqueValue(extractPath(path), method)
 
 	return s.Router.HandleFunc(path, f).Methods(method), nil
 }
@@ -97,7 +92,6 @@ func (s *Service) RegisterFileServer(path, method, filepath string) (*mux.Route,
 
 // ListenAndServe registers the catch all route and starts the server
 func (s *Service) ListenAndServe() error {
-	//s.Router.PathPrefix("/").Handler(s)
 	err := s.Router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 		pathTemplate, err := route.GetPathTemplate()
 		if err != nil {
@@ -113,6 +107,7 @@ func (s *Service) ListenAndServe() error {
 	return s.Server.ListenAndServe()
 }
 
+/*
 // ServeHTTP is the catch all handler
 func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var err error
@@ -133,6 +128,7 @@ func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		s.Log.Errorf("catchAll failed: %s", err)
 	}
 }
+*/
 
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
 	s.Log.Warnf("endpoint not implemented: %s | %s", request.Method, request.RequestURI)
@@ -146,9 +142,8 @@ func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Requ
 func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *http.Request) {
 	s.Log.Warnf("method not allowed: %s | %s", request.Method, request.RequestURI)
 
-	var methods []string
+	methods := make([]string, 0)
 	for _, m := range getAllowedHTTPMethods() {
-		fmt.Println(request.Method, m)
 		if request.Method == m {
 			continue
 		}
@@ -158,8 +153,7 @@ func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *h
 		if !s.Router.Match(simReq, match) || match.MatchErr != nil {
 			continue
 		}
-		fmt.Printf("MATCH: %#v\n", match)
-		fmt.Printf("err: %s\n", match.MatchErr)
+
 		methods = append(methods, m)
 	}
 	writer.Header().Add("Allow", strings.Join(methods, ","))
@@ -170,10 +164,12 @@ func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *h
 	}
 }
 
+/*
 func extractPath(path string) string {
 	r := regexp.MustCompile(`\/[\w-]+`)
 	return strings.Join(r.FindAllString(path, -1), "")
 }
+*/
 
 func getAllowedHTTPMethods() slice.StringSlice {
 	return slice.StringSlice{
