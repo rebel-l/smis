@@ -7,7 +7,6 @@
   "linters": {
     "enable-all": true,
     "disable": [
-      "gochecknoglobals",
       "scopelint"
     ]
   },
