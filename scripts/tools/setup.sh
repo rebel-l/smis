@@ -48,6 +48,11 @@ echo -en "\E[40;34m\033[1mInstall: goconvey\033[0m"
 echo
 go get -u github.com/smartystreets/goconvey
 
+# install gomock
+echo -en "\E[40;34m\033[1mInstall: gomock\033[0m"
+go get github.com/golang/mock/gomock
+go install github.com/golang/mock/mockgen
+
 # hooks
 echo -en "\E[40;34m\033[1mSetup: hooks\033[0m"
 echo
