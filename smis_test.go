@@ -8,6 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/rebel-l/smis/mocks/logrus_mock"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -159,8 +163,14 @@ func TestService_RegisterEndpoint(t *testing.T) {
 }*/
 
 func TestService_ServeHTTP(t *testing.T) {
-	// TODO: mock logger
-	service, err := NewService(&http.Server{}, logrus.New())
+	// TODO: test registering file server
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := logrus_mock.NewMockFieldLogger(ctrl)
+	m.EXPECT().Warnf(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	service, err := NewService(&http.Server{}, m)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}

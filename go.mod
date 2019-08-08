@@ -3,6 +3,7 @@ module github.com/rebel-l/smis
 go 1.12
 
 require (
+	github.com/golang/mock v1.3.1
 	github.com/gorilla/mux v1.7.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/rebel-l/go-utils v0.6.0

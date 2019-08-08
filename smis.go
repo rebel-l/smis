@@ -1,3 +1,5 @@
+//go:generate mockgen -destination mocks/logrus_mock/fieldlogger.go -package logrus_mock github.com/sirupsen/logrus FieldLogger
+
 // Package smis provides the basic functions to run a service
 package smis
 
