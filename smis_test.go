@@ -1,3 +1,6 @@
+//go:generate mockgen -destination mocks/logrus_mock/fieldlogger.go -package logrus_mock github.com/sirupsen/logrus FieldLogger
+//go:generate mockgen -destination mocks/smis_mock/smis.go -package smis_mock github.com/rebel-l/smis Server
+
 package smis
 
 import (
@@ -7,6 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rebel-l/smis/mocks/smis_mock"
 
 	"github.com/golang/mock/gomock"
 
@@ -163,7 +168,6 @@ func TestService_RegisterEndpoint(t *testing.T) {
 }*/
 
 func TestService_ServeHTTP(t *testing.T) {
-	// TODO: test registering file server
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -439,6 +443,30 @@ func TestService_ServeHTTP(t *testing.T) {
 				t.Errorf("expected body to be '%s' but got '%s'", testcase.expectedBody, string(body))
 			}
 		})
+	}
+}
+
+func TestService_ListenAndServe(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	serverMock := smis_mock.NewMockServer(ctrl)
+	serverMock.EXPECT().ListenAndServe().Times(1)
+
+	logMock := logrus_mock.NewMockFieldLogger(ctrl)
+	logMock.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
+
+	service, err := NewService(serverMock, logMock)
+	if err != nil {
+		t.Fatalf("failed to create server: %s", err)
+	}
+
+	route := service.Router.NewRoute()
+	route.Name("ping")
+	route.Path("/ping")
+
+	if err = service.ListenAndServe(); err != nil {
+		t.Fatalf("ListenAndServe should not throw an error, but got: %s", err)
 	}
 }
 
