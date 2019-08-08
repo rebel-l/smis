@@ -220,6 +220,11 @@ func TestService_ServeHTTP(t *testing.T) {
 		}
 	}
 
+	_, err = service.RegisterFileServer("/static", http.MethodGet, "./tests/data/staticfiles")
+	if err != nil {
+		t.Fatalf("failed to register file serer: %s", err)
+	}
+
 	// define test cases
 	headerSkip := make(map[string]string)
 
@@ -385,6 +390,20 @@ func TestService_ServeHTTP(t *testing.T) {
 			expectedStatus: "404 Not Found",
 			expectedHeader: headerSkip,
 			expectedBody:   "endpoint not implemented",
+		},
+		{
+			name:           "static endpoint - file exists",
+			request:        httptest.NewRequest(http.MethodGet, "/static/something", nil),
+			expectedStatus: "200 OK",
+			expectedHeader: headerSkip,
+			expectedBody:   "This is just some content.",
+		},
+		{
+			name:           "static endpoint - file exists",
+			request:        httptest.NewRequest(http.MethodGet, "/static/somethingelse", nil),
+			expectedStatus: "404 Not Found",
+			expectedHeader: headerSkip,
+			expectedBody:   "404 page not found\n",
 		},
 	}
 
