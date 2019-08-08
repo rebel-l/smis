@@ -3,15 +3,12 @@ package smis
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/rebel-l/go-utils/slice"
-
-	"github.com/gorilla/mux"
 )
 
 func TestNewService(t *testing.T) {
@@ -63,6 +60,7 @@ func TestNewService(t *testing.T) {
 	}
 }
 
+/*
 func TestService_RegisterEndpoint(t *testing.T) {
 	testcases := []struct {
 		name   string
@@ -158,55 +156,264 @@ func TestService_RegisterEndpoint(t *testing.T) {
 			//}
 		})
 	}
-}
+}*/
 
 func TestService_ServeHTTP(t *testing.T) {
-	testcases := []struct {
-		name    string
+	// TODO: mock logger
+	service, err := NewService(&http.Server{}, logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	// setup endpoints
+	endpoints := []struct {
 		path    string
 		method  string
-		request *http.Request
+		handler func(writer http.ResponseWriter, request *http.Request)
 	}{
 		{
-			name:    "root path / get",
-			path:    "/",
-			method:  http.MethodGet,
-			request: httptest.NewRequest(http.MethodPut, "/", nil),
+			path:   "/health",
+			method: http.MethodGet,
+			handler: func(writer http.ResponseWriter, _ *http.Request) {
+				_, err := io.WriteString(writer, "health endpoint")
+				if err != nil {
+					t.Fatalf("failed to write response: %s", err)
+				}
+			},
 		},
 		{
-			name:    "path with param",
-			path:    "/route/:param",
-			method:  http.MethodPut,
-			request: httptest.NewRequest(http.MethodGet, "/route/12358", nil),
+			path:   "/user/{id}",
+			method: http.MethodPut,
+			handler: func(writer http.ResponseWriter, _ *http.Request) {
+				_, err := io.WriteString(writer, "user endpoint - PUT")
+				if err != nil {
+					t.Fatalf("failed to write response: %s", err)
+				}
+			},
+		},
+		{
+			path:   "/user/{id}",
+			method: http.MethodPost,
+			handler: func(writer http.ResponseWriter, _ *http.Request) {
+				_, err := io.WriteString(writer, "user endpoint - POST")
+				if err != nil {
+					t.Fatalf("failed to write response: %s", err)
+				}
+			},
+		},
+	}
+
+	for _, e := range endpoints {
+		_, err := service.RegisterEndpoint(e.path, e.method, e.handler)
+		if err != nil {
+			t.Fatalf("failed to register endpoint: %s", err)
+		}
+	}
+
+	// define test cases
+	headerSkip := make(map[string]string)
+
+	headerPlain := make(map[string]string)
+	headerPlain["Content-type"] = "text/plain; charset=utf-8"
+
+	headerNotAllowed := make(map[string]string)
+	headerNotAllowed["Allow"] = "GET"
+
+	headerNotAllowed2 := make(map[string]string)
+	headerNotAllowed2["Allow"] = "POST,PUT"
+
+	testcases := []struct {
+		name           string
+		request        *http.Request
+		expectedStatus string
+		expectedHeader map[string]string
+		expectedBody   string
+	}{
+		{
+			name:           "root path / get",
+			request:        httptest.NewRequest(http.MethodGet, "/", nil),
+			expectedStatus: "404 Not Found",
+			expectedHeader: headerSkip,
+			expectedBody:   "endpoint not implemented",
+		},
+		{
+			name:           "health endpoint - GET",
+			request:        httptest.NewRequest(http.MethodGet, "/health", nil),
+			expectedStatus: "200 OK",
+			expectedHeader: headerPlain,
+			expectedBody:   "health endpoint",
+		},
+		{
+			name:           "health endpoint - CONNECT",
+			request:        httptest.NewRequest(http.MethodConnect, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - DELETE",
+			request:        httptest.NewRequest(http.MethodDelete, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - HEAD",
+			request:        httptest.NewRequest(http.MethodHead, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - OPTIONS",
+			request:        httptest.NewRequest(http.MethodOptions, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - PATCH",
+			request:        httptest.NewRequest(http.MethodPatch, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - POST",
+			request:        httptest.NewRequest(http.MethodPost, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - PUT",
+			request:        httptest.NewRequest(http.MethodPut, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "health endpoint - TRACE",
+			request:        httptest.NewRequest(http.MethodTrace, "/health", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - POST",
+			request:        httptest.NewRequest(http.MethodPost, "/user/1", nil),
+			expectedStatus: "200 OK",
+			expectedHeader: headerPlain,
+			expectedBody:   "user endpoint - POST",
+		},
+		{
+			name:           "user endpoint - PUT",
+			request:        httptest.NewRequest(http.MethodPut, "/user/2", nil),
+			expectedStatus: "200 OK",
+			expectedHeader: headerPlain,
+			expectedBody:   "user endpoint - PUT",
+		},
+		{
+			name:           "user endpoint - CONNECT",
+			request:        httptest.NewRequest(http.MethodConnect, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - DELETE",
+			request:        httptest.NewRequest(http.MethodDelete, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - HEAD",
+			request:        httptest.NewRequest(http.MethodHead, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - GET",
+			request:        httptest.NewRequest(http.MethodGet, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - HEAF",
+			request:        httptest.NewRequest(http.MethodHead, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - OPTIONS",
+			request:        httptest.NewRequest(http.MethodOptions, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - PATCH",
+			request:        httptest.NewRequest(http.MethodPatch, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - TRACE",
+			request:        httptest.NewRequest(http.MethodTrace, "/user/3", nil),
+			expectedStatus: "405 Method Not Allowed",
+			expectedHeader: headerNotAllowed2,
+			expectedBody:   "method not allowed, please check response headers for allowed methods",
+		},
+		{
+			name:           "user endpoint - GET - not implemented",
+			request:        httptest.NewRequest(http.MethodDelete, "/user/", nil),
+			expectedStatus: "404 Not Found",
+			expectedHeader: headerSkip,
+			expectedBody:   "endpoint not implemented",
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			service := &Service{Router: mux.NewRouter(), Log: logrus.New()}
-			route, err := service.RegisterEndpoint(testcase.path, testcase.method, func(writer http.ResponseWriter, request *http.Request) {
-				_, err := io.WriteString(writer, "We should not get this response")
-				if err != nil {
-					t.Fatalf("failed to writs response: %s", err)
-				}
-			})
-
-			if err != nil {
-				t.Fatalf("failed to register endpoint: %s", err)
-			}
-			t.Log(route)
-			//t.Log(service.registeredEndpoints)
-
 			w := httptest.NewRecorder()
 			service.Router.ServeHTTP(w, testcase.request)
 			resp := w.Result()
-			t.Log(resp)
-			t.Log(route.GetPathTemplate())
-			//service.Router.NotFoundHandler
+
+			// check status
+			if testcase.expectedStatus != resp.Status {
+				t.Errorf("expected status '%s' but got '%s'", testcase.expectedStatus, resp.Status)
+			}
+
+			// check header
+			for key, expectedHeader := range testcase.expectedHeader {
+				header := resp.Header.Get(key)
+				if expectedHeader != header {
+					t.Errorf("expected haeder for key '%s' to be '%s' but got '%s'", key, expectedHeader, header)
+				}
+			}
+
+			// check body
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
+			}
+
+			if testcase.expectedBody != string(body) {
+				t.Errorf("expected body to be '%s' but got '%s'", testcase.expectedBody, string(body))
+			}
 		})
 	}
 }
 
+/*
 func Test_NotFound(t *testing.T) {
 	service, err := NewService(&http.Server{}, logrus.New())
 	if err != nil {
@@ -237,7 +444,7 @@ func Test_NotAllowed(t *testing.T) {
 	service.Router.ServeHTTP(w, req)
 	t.Log(w.Result())
 }
-
+*/
 /*
 func TestExtractPath(t *testing.T) {
 	tests := []struct {
