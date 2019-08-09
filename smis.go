@@ -30,7 +30,6 @@ type Service struct {
 	//SubRouters          map[string]*mux.Router
 	Server Server
 	//MiddlewareChain     map[string][]mux.MiddlewareFunc
-	//registeredEndpoints mapof.StringSliceMap
 }
 
 // NewService returns an initialized service struct
@@ -107,29 +106,6 @@ func (s *Service) ListenAndServe() error {
 	return s.Server.ListenAndServe()
 }
 
-/*
-// ServeHTTP is the catch all handler
-func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	var err error
-	path := extractPath(request.RequestURI)
-
-	if s.registeredEndpoints.KeyExists(path) {
-		//s.Log.Warnf("method not allowed: %s | %s", request.Method, request.RequestURI)
-		//writer.Header().Add("Allow", strings.Join(s.registeredEndpoints.GetValuesForKey(path), ","))
-		//writer.WriteHeader(405)
-		//_, err = writer.Write([]byte("method not allowed, please check response headers for allowed methods"))
-	} else {
-		//s.Log.Warnf("endpoint not implemented: %s | %s", request.Method, request.RequestURI)
-		//writer.WriteHeader(404)
-		//_, err = writer.Write([]byte("endpoint not implemented"))
-	}
-
-	if err != nil {
-		s.Log.Errorf("catchAll failed: %s", err)
-	}
-}
-*/
-
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
 	s.Log.Warnf("endpoint not implemented: %s | %s", request.Method, request.RequestURI)
 	writer.WriteHeader(404)
@@ -163,13 +139,6 @@ func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *h
 		s.Log.Errorf("notAllowedHandler failed to send response: %s", err)
 	}
 }
-
-/*
-func extractPath(path string) string {
-	r := regexp.MustCompile(`\/[\w-]+`)
-	return strings.Join(r.FindAllString(path, -1), "")
-}
-*/
 
 func getAllowedHTTPMethods() slice.StringSlice {
 	return slice.StringSlice{
