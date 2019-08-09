@@ -1,3 +1,4 @@
+//go:generate mockgen -destination mocks/http_mock/responseWriter.go -package http_mock net/http ResponseWriter
 //go:generate mockgen -destination mocks/logrus_mock/fieldlogger.go -package logrus_mock github.com/sirupsen/logrus FieldLogger
 //go:generate mockgen -destination mocks/smis_mock/smis.go -package smis_mock github.com/rebel-l/smis Server
 
@@ -10,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rebel-l/smis/mocks/http_mock"
 
 	"github.com/rebel-l/smis/mocks/smis_mock"
 
@@ -513,19 +516,31 @@ func TestService_ListenAndServe(t *testing.T) {
 	}
 }
 
-/*
-func Test_NotFound(t *testing.T) {
-	service, err := NewService(&http.Server{}, logrus.New())
+func Test_NotFound_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	errMsg := fmt.Errorf("something happened")
+
+	logMock := logrus_mock.NewMockFieldLogger(ctrl)
+	logMock.EXPECT().Warnf(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+	logMock.EXPECT().
+		Errorf(gomock.Eq("notFoundHandler failed to send response: %s"), gomock.Eq(errMsg)).
+		Times(1)
+
+	service, err := NewService(&http.Server{}, logMock)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	w := httptest.NewRecorder()
+	writerMock := http_mock.NewMockResponseWriter(ctrl)
+	writerMock.EXPECT().WriteHeader(404).Times(1)
+	writerMock.EXPECT().Write(gomock.Any()).Return(0, errMsg)
 	req := httptest.NewRequest(http.MethodPut, "/something", nil)
-	service.Router.ServeHTTP(w, req)
-	t.Log(w.Result())
+	service.notFoundHandler(writerMock, req)
 }
 
+/*
 func Test_NotAllowed(t *testing.T) {
 	service, err := NewService(&http.Server{}, logrus.New())
 	if err != nil {
