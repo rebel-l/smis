@@ -127,7 +127,7 @@ func TestService_ServeHTTP(t *testing.T) {
 	endpoints := []struct {
 		path    string
 		method  string
-		handler func(writer http.ResponseWriter, request *http.Request)
+		handler http.HandlerFunc
 	}{
 		{
 			path:   "/health",
@@ -375,6 +375,116 @@ func TestService_ServeHTTP(t *testing.T) {
 			}
 
 			// check body
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
+			}
+
+			if testcase.expectedBody != string(body) {
+				t.Errorf("expected body to be '%s' but got '%s'", testcase.expectedBody, string(body))
+			}
+		})
+	}
+}
+
+func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := logrus_mock.NewMockFieldLogger(ctrl)
+
+	serviceDefault, err := NewService(&http.Server{}, m)
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	serviceSubRouters, err := NewService(&http.Server{}, m)
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	endpoint := func(_ http.ResponseWriter, _ *http.Request) {}
+
+	// default
+	middlewareDefault := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, err := writer.Write([]byte("default middleware"))
+			if err != nil {
+				t.Fatalf("failed to send response from default middleware: %s", err)
+			}
+		})
+	}
+	serviceDefault.AddMiddlewareForDefaultChain(middlewareDefault)
+	_, err = serviceDefault.RegisterEndpoint("/main", http.MethodGet, endpoint)
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	// public
+	middlewarePublic := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, err := writer.Write([]byte("public middleware"))
+			if err != nil {
+				t.Fatalf("failed to send response from public middleware: %s", err)
+			}
+		})
+	}
+	serviceSubRouters.AddMiddlewareForPublicChain(middlewarePublic)
+	_, err = serviceSubRouters.RegisterEndpointToPublicChain("/weather", http.MethodGet, endpoint)
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	// restricted
+	middlewareRestricted := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, err := writer.Write([]byte("restricted middleware"))
+			if err != nil {
+				t.Fatalf("failed to send response from restricted middleware: %s", err)
+			}
+		})
+	}
+	serviceSubRouters.AddMiddlewareForRestrictedChain(middlewareRestricted)
+	_, err = serviceSubRouters.RegisterEndpointToRestictedChain("/admin", http.MethodGet, endpoint)
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	testcases := []struct {
+		name         string
+		request      *http.Request
+		expectedBody string
+		service      *Service
+	}{
+		{
+			name:         "default",
+			request:      httptest.NewRequest(http.MethodGet, "/main", nil),
+			expectedBody: "default middleware",
+			service:      serviceDefault,
+		},
+		{
+			name:         "public",
+			request:      httptest.NewRequest(http.MethodGet, "/public/weather", nil),
+			expectedBody: "public middleware",
+			service:      serviceSubRouters,
+		},
+		{
+			name:         "restricted",
+			request:      httptest.NewRequest(http.MethodGet, "/restricted/admin", nil),
+			expectedBody: "restricted middleware",
+			service:      serviceSubRouters,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			testcase.service.Router.ServeHTTP(w, testcase.request)
+			resp := w.Result()
+
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatalf("failed to read body: %s", err)

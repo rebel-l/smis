@@ -14,8 +14,14 @@ import (
 )
 
 const (
-//MiddlewareChainPublic     = "public"
-//MiddlewareChainRestricted = "restricted"
+	// MiddlewareChainDefault is the identifier for the default middleware chain
+	MiddlewareChainDefault = "default"
+
+	// MiddlewareChainPublic is the identifier for the public middleware chain
+	MiddlewareChainPublic = "public"
+
+	// MiddlewareChainRestricted is the identifier for the restricted middleware chain
+	MiddlewareChainRestricted = "restricted"
 )
 
 // Server is an interface to describe how to serve endpoints
@@ -25,11 +31,10 @@ type Server interface {
 
 // Service represents the fields necessary for a service
 type Service struct {
-	Log    logrus.FieldLogger
-	Router *mux.Router
-	//SubRouters          map[string]*mux.Router
-	Server Server
-	//MiddlewareChain     map[string][]mux.MiddlewareFunc
+	Log        logrus.FieldLogger
+	Router     *mux.Router
+	Server     Server
+	SubRouters map[string]*mux.Router
 }
 
 // NewService returns an initialized service struct
@@ -53,31 +58,89 @@ func NewService(server Server, log logrus.FieldLogger) (*Service, error) {
 	return service, nil
 }
 
-/*
-func (s *Service) AddMiddleware(chain string, middleware mux.MiddlewareFunc) {
-	s.MiddlewareChain[chain] = append(s.MiddlewareChain[chain], middleware)
+// GetRouterForMiddlewareChain returns the router (sub router) for a given chain.
+// If a chain doesn't exist, it creates it.
+func (s *Service) GetRouterForMiddlewareChain(chain string) *mux.Router {
+	var router *mux.Router
+	switch chain {
+	case MiddlewareChainDefault:
+		router = s.Router
+	default:
+		if s.SubRouters == nil {
+			s.SubRouters = make(map[string]*mux.Router)
+		}
+
+		var ok bool
+		router, ok = s.SubRouters[chain]
+		if !ok {
+			router = s.Router.PathPrefix("/" + chain).Subrouter()
+			s.SubRouters[chain] = router
+		}
+	}
+	return router
 }
 
+// AddMiddleware adds middleware to a specific chain. You can create custom chains with this method. The chain is
+// also the path prefix, eg. your chain is "custom" your routes will start with "/custom"
+func (s *Service) AddMiddleware(chain string, middleware mux.MiddlewareFunc) {
+	router := s.GetRouterForMiddlewareChain(chain)
+	router.Use(middleware)
+}
+
+// AddMiddlewareForDefaultChain adds middleware to the default chain. NOTE: The default chain is working without
+// path prefix and uses the main router.
+func (s *Service) AddMiddlewareForDefaultChain(middleware mux.MiddlewareFunc) {
+	s.AddMiddleware(MiddlewareChainDefault, middleware)
+}
+
+// AddMiddlewareForPublicChain adds middleware to the public chain. NOTE: The path prefix is /public.
 func (s *Service) AddMiddlewareForPublicChain(middleware mux.MiddlewareFunc) {
 	s.AddMiddleware(MiddlewareChainPublic, middleware)
 }
 
+// AddMiddlewareForRestrictedChain adds middleware to the restricted chain. NOTE: The path prefix is /restricted.
 func (s *Service) AddMiddlewareForRestrictedChain(middleware mux.MiddlewareFunc) {
 	s.AddMiddleware(MiddlewareChainRestricted, middleware)
 }
-*/
 
 // RegisterEndpoint registers a handler at the router for the given method and path.
-// In case the method is not known an error is return, otherwise a *Route.
+// In case the method is not known an error is returned, otherwise a *Route.
 func (s *Service) RegisterEndpoint(
-	path, method string, f func(http.ResponseWriter, *http.Request)) (*mux.Route, error) {
+	path, method string, f http.HandlerFunc) (*mux.Route, error) {
+
+	return s.RegisterEndpointToChain(MiddlewareChainDefault, path, method, f)
+}
+
+// RegisterEndpointToPublicChain registers a handler at the router for the given method and path at the public chain.
+// In case the method is not known an error is returned, otherwise a *Route.
+func (s *Service) RegisterEndpointToPublicChain(
+	path, method string, f http.HandlerFunc) (*mux.Route, error) {
+
+	return s.RegisterEndpointToChain(MiddlewareChainPublic, path, method, f)
+}
+
+// RegisterEndpointToRestictedChain registers a handler at the router for the given method and path at the
+// restricted chain.
+// In case the method is not known an error is returned, otherwise a *Route.
+func (s *Service) RegisterEndpointToRestictedChain(
+	path, method string, f http.HandlerFunc) (*mux.Route, error) {
+
+	return s.RegisterEndpointToChain(MiddlewareChainRestricted, path, method, f)
+}
+
+// RegisterEndpointToChain registers a handler at the router for the given method and path at any chain. You can use
+// your custom chains with this method.
+// In case the method is not known an error is returned, otherwise a *Route.
+func (s *Service) RegisterEndpointToChain(
+	chain, path, method string, f http.HandlerFunc) (*mux.Route, error) {
 
 	methods := getAllowedHTTPMethods()
 	if methods.IsNotIn(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
 
-	return s.Router.HandleFunc(path, f).Methods(method), nil
+	router := s.GetRouterForMiddlewareChain(chain)
+	return router.HandleFunc(path, f).Methods(method), nil
 }
 
 // RegisterFileServer registers a file server to provide static files
@@ -156,4 +219,3 @@ func getAllowedHTTPMethods() slice.StringSlice {
 
 // TODO: deal with OPTIONS request (CORS/ACAO/ACAM/ACAH) ==> CORS Middleware
 // TODO: add possibility to configure CORS
-// TODO: introduce different middleware chains ==> predefined: public / restricted
