@@ -540,26 +540,31 @@ func Test_NotFound_Error(t *testing.T) {
 	service.notFoundHandler(writerMock, req)
 }
 
-/*
-func Test_NotAllowed(t *testing.T) {
-	service, err := NewService(&http.Server{}, logrus.New())
+func Test_NotAllowed_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	errMsg := fmt.Errorf("response writer closed")
+
+	logMock := logrus_mock.NewMockFieldLogger(ctrl)
+	logMock.EXPECT().Warnf(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+	logMock.EXPECT().
+		Errorf(gomock.Eq("notAllowedHandler failed to send response: %s"), gomock.Eq(errMsg)).
+		Times(1)
+
+	service, err := NewService(&http.Server{}, logMock)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	_, err = service.RegisterEndpoint("/path", http.MethodGet, func(writer http.ResponseWriter, request *http.Request) {
-		_, err := io.WriteString(writer, "We should not get this response")
-		if err != nil {
-			t.Fatalf("failed to writs response: %s", err)
-		}
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/path", nil)
-	service.Router.ServeHTTP(w, req)
-	t.Log(w.Result())
+	writerMock := http_mock.NewMockResponseWriter(ctrl)
+	writerMock.EXPECT().WriteHeader(405).Times(1)
+	writerMock.EXPECT().Header().Times(1).Return(http.Header{})
+	writerMock.EXPECT().Write(gomock.Any()).Return(0, errMsg)
+	req := httptest.NewRequest(http.MethodPut, "/notAllowed", nil)
+	service.methodNotAllowedHandler(writerMock, req)
 }
-*/
+
 /*
 func TestExtractPath(t *testing.T) {
 	tests := []struct {
