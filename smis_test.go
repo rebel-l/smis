@@ -450,23 +450,66 @@ func TestService_ListenAndServe(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	serverMock := smis_mock.NewMockServer(ctrl)
-	serverMock.EXPECT().ListenAndServe().Times(1)
+	// success
+	serverMockSuccess := smis_mock.NewMockServer(ctrl)
+	serverMockSuccess.EXPECT().ListenAndServe().Times(1)
 
-	logMock := logrus_mock.NewMockFieldLogger(ctrl)
-	logMock.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
+	logMockSuccess := logrus_mock.NewMockFieldLogger(ctrl)
+	logMockSuccess.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
 
-	service, err := NewService(serverMock, logMock)
+	serviceSuccess, err := NewService(serverMockSuccess, logMockSuccess)
 	if err != nil {
 		t.Fatalf("failed to create server: %s", err)
 	}
 
-	route := service.Router.NewRoute()
-	route.Name("ping")
-	route.Path("/ping")
+	routeSuccess := serviceSuccess.Router.NewRoute()
+	routeSuccess.Path("/ping")
 
-	if err = service.ListenAndServe(); err != nil {
-		t.Fatalf("ListenAndServe should not throw an error, but got: %s", err)
+	// error
+	serverMockError := smis_mock.NewMockServer(ctrl)
+	serverMockError.EXPECT().ListenAndServe().Times(0)
+
+	logMockError := logrus_mock.NewMockFieldLogger(ctrl)
+	logMockError.EXPECT().Infof(gomock.Any(), gomock.Any()).Times(0)
+
+	serviceError, err := NewService(serverMockError, logMockError)
+	if err != nil {
+		t.Fatalf("failed to create server: %s", err)
+	}
+
+	routeError := serviceError.Router.NewRoute()
+	routeError.Name("health")
+	routeError.Path("/health")
+	routeError.Name("health new") // this causes an error
+
+	// tests
+	testcases := []struct {
+		name    string
+		service *Service
+		err     error
+	}{
+		{
+			name:    "success",
+			service: serviceSuccess,
+		},
+		{
+			name:    "error",
+			service: serviceError,
+			err:     fmt.Errorf(`mux: route already has name "health", can't set "health new"`),
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			err := testcase.service.ListenAndServe()
+			if testcase.err == nil && err != nil {
+				t.Errorf("ListenAndServe should NOT throw an error, but got: %s", err)
+			}
+
+			if testcase.err != nil && (err == nil || testcase.err.Error() != err.Error()) {
+				t.Errorf("ListenAndServe should throw an error '%s', but got '%v'", testcase.err, err)
+			}
+		})
 	}
 }
 
