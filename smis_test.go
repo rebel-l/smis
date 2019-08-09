@@ -12,13 +12,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rebel-l/smis/mocks/http_mock"
+	"github.com/gorilla/mux"
 
+	"github.com/rebel-l/smis/mocks/http_mock"
+	"github.com/rebel-l/smis/mocks/logrus_mock"
 	"github.com/rebel-l/smis/mocks/smis_mock"
 
 	"github.com/golang/mock/gomock"
-
-	"github.com/rebel-l/smis/mocks/logrus_mock"
 
 	"github.com/sirupsen/logrus"
 )
@@ -72,103 +72,44 @@ func TestNewService(t *testing.T) {
 	}
 }
 
-/*
-func TestService_RegisterEndpoint(t *testing.T) {
+func TestService_RegisterEndpoint_Error(t *testing.T) {
 	testcases := []struct {
 		name   string
 		path   string
 		method string
-		err    error
 	}{
 		{
-			name: "not allowed method",
-			err:  fmt.Errorf("method  is not allowed"),
+			name: "no path / method",
 		},
 		{
-			name:   "method connect",
-			path:   "/health",
-			method: http.MethodConnect,
+			name:   "method only",
+			method: "batman",
 		},
 		{
-			name:   "method delete",
-			path:   "/ping",
-			method: http.MethodDelete,
-		},
-		{
-			name:   "method get",
-			path:   "/route",
-			method: http.MethodGet,
-		},
-		{
-			name:   "method head",
-			path:   "/route/sub",
-			method: http.MethodHead,
-		},
-		{
-			name:   "method options",
-			path:   "/route/:param",
-			method: http.MethodOptions,
-		},
-		{
-			name:   "method patch",
+			name:   "method and path",
+			method: "spiderman",
 			path:   "/something",
-			method: http.MethodPatch,
-		},
-		{
-			name:   "method post",
-			path:   "/else",
-			method: http.MethodPost,
-		},
-		{
-			name:   "method put",
-			path:   "/to",
-			method: http.MethodPut,
-		},
-		{
-			name:   "method trace",
-			path:   "/test",
-			method: http.MethodTrace,
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			service := &Service{Router: mux.NewRouter()}
-			route, err := service.RegisterEndpoint(
+			_, err := service.RegisterEndpoint(
 				testcase.path,
 				testcase.method,
 				func(_ http.ResponseWriter, _ *http.Request) {},
 			)
 
-			if err != nil && testcase.err != nil {
-				if err.Error() != testcase.err.Error() {
-					t.Errorf("Expected the error '%s' but got '%s'", testcase.err, err)
-				}
-				return
+			msg := fmt.Errorf("method %s is not allowed", testcase.method)
+			if err == nil {
+				t.Error("expected an error to be thrown but got nil")
+			} else if msg.Error() != err.Error() {
+				t.Errorf("expected error '%s' but got '%s'", msg, err)
 			}
-
-			// check methods
-			var methods slice.StringSlice
-			methods, err = route.GetMethods()
-			if err != nil {
-				t.Fatal("cannot retrieve from created route")
-			}
-			if methods.IsNotIn(testcase.method) {
-				t.Errorf("method '%s' is not set on route", testcase.method)
-			}
-
-			// check registered endpoints
-			//path := extractPath(testcase.path)
-			//if service.registeredEndpoints.KeyNotExists(path) {
-			//	t.Errorf("path '%s' is not added to registred endpoints", path)
-			//}
-			//
-			//if service.registeredEndpoints.GetValuesForKey(path).IsNotIn(testcase.method) {
-			//	t.Errorf("method '%s' is not set added to registered endpoints: %v", testcase.method, service.registeredEndpoints)
-			//}
 		})
 	}
-}*/
+}
 
 func TestService_ServeHTTP(t *testing.T) {
 	ctrl := gomock.NewController(t)
