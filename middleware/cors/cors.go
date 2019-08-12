@@ -47,7 +47,11 @@ func (c *cors) handler(next http.Handler) http.Handler {
 			writer.Header().Set(HeaderACAO, origin)
 			writer.Header().Set(HeaderACAM, "GET") // TODO: get them dynamically from Router
 			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessContolAllowHeaders, ","))
-			writer.Header().Set(HeaderACMA, fmt.Sprint(AccessControlMaxAgeDefault)) // TODO: should be configurable
+			maxAge := c.Config.AccessControlMaxAge
+			if maxAge <= 0 {
+				maxAge = AccessControlMaxAgeDefault
+			}
+			writer.Header().Set(HeaderACMA, fmt.Sprint(maxAge))
 		}
 
 		if request.Method == http.MethodOptions {

@@ -76,12 +76,13 @@ func TestNewCORS(t *testing.T) {
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"*"},
 				AccessContolAllowHeaders:  slice.StringSlice{"token"},
+				AccessControlMaxAge:       10,
 			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
 			expectedHeaders: "token",
-			expectedMaxAge:  "86400",
+			expectedMaxAge:  "10",
 		},
 		{
 			name:    "post - allow",
