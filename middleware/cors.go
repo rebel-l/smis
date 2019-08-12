@@ -1,11 +1,10 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
-
-	"github.com/rebel-l/go-utils/slice"
 )
 
 const (
@@ -20,15 +19,19 @@ const (
 
 	// HeaderACMA header key for Access-Control-Max-Age
 	HeaderACMA = "Access-Control-Max-Age"
+
+	// AccessControlMaxAgeDefault is the default max age of ACA* headers in seconds
+	AccessControlMaxAgeDefault = 86400
 )
 
 type cors struct {
-	Origins slice.StringSlice
+	Config Config
+	Router *mux.Router
 }
 
 // NewCORS returns a middleware to handle CORS requests
-func NewCORS(origins slice.StringSlice) mux.MiddlewareFunc {
-	middleware := &cors{Origins: origins}
+func NewCORS(router *mux.Router, config Config) mux.MiddlewareFunc {
+	middleware := &cors{Config: config, Router: router}
 	return middleware.handler
 }
 
@@ -39,11 +42,11 @@ func (c *cors) handler(next http.Handler) http.Handler {
 		// All other known browsers do correctly the OPTIONS request.
 
 		origin := request.Header.Get("Origin")
-		if c.Origins.IsIn(origin) || c.Origins.IsIn("*") {
+		if c.Config.AccessControlAllowOrigins.IsIn(origin) || c.Config.AccessControlAllowOrigins.IsIn("*") {
 			writer.Header().Set(HeaderACAO, origin)
-			writer.Header().Set(HeaderACAM, "GET")   // TODO: get them dynamically from Router
-			writer.Header().Set(HeaderACAH, "*")     // TODO: should be configurable
-			writer.Header().Set(HeaderACMA, "86400") // TODO: should be configurable
+			writer.Header().Set(HeaderACAM, "GET")                                  // TODO: get them dynamically from Router
+			writer.Header().Set(HeaderACAH, "*")                                    // TODO: should be configurable
+			writer.Header().Set(HeaderACMA, fmt.Sprint(AccessControlMaxAgeDefault)) // TODO: should be configurable
 		}
 
 		if request.Method == http.MethodOptions {

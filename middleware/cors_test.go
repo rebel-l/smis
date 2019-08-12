@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gorilla/mux"
+
 	"github.com/golang/mock/gomock"
 	"github.com/rebel-l/smis/tests/mocks/http_mock"
 
-	"github.com/rebel-l/go-utils/slice"
 	"github.com/rebel-l/smis/middleware"
 )
 
@@ -39,7 +40,7 @@ func TestNewCORS(t *testing.T) {
 	testCases := []struct {
 		name            string
 		request         *http.Request
-		allowedOrigins  slice.StringSlice
+		config          middleware.Config
 		nextHandler     http.Handler
 		expectedOrigin  string
 		expectedMethods string
@@ -49,7 +50,7 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:            "options - allow",
 			request:         reqOptions,
-			allowedOrigins:  []string{"http://example.com"},
+			config:          middleware.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -57,15 +58,15 @@ func TestNewCORS(t *testing.T) {
 			expectedMaxAge:  "86400",
 		},
 		{
-			name:           "options - forbidden",
-			request:        reqOptions,
-			allowedOrigins: []string{"http://example.com:80"},
-			nextHandler:    createOptionsHanlder(ctrl),
+			name:        "options - forbidden",
+			request:     reqOptions,
+			config:      middleware.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			nextHandler: createOptionsHanlder(ctrl),
 		},
 		{
 			name:            "options - allow *",
 			request:         reqOptions,
-			allowedOrigins:  []string{"*"},
+			config:          middleware.Config{AccessControlAllowOrigins: []string{"*"}},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -75,7 +76,7 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:            "post - allow",
 			request:         reqPost,
-			allowedOrigins:  []string{"http://example.com"},
+			config:          middleware.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -83,15 +84,15 @@ func TestNewCORS(t *testing.T) {
 			expectedMaxAge:  "86400",
 		},
 		{
-			name:           "post - forbidden",
-			request:        reqPost,
-			allowedOrigins: []string{"http://example.com:80"},
-			nextHandler:    createHandler(ctrl),
+			name:        "post - forbidden",
+			request:     reqPost,
+			config:      middleware.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			nextHandler: createHandler(ctrl),
 		},
 		{
 			name:            "post - allow *",
 			request:         reqPost,
-			allowedOrigins:  []string{"*"},
+			config:          middleware.Config{AccessControlAllowOrigins: []string{"*"}},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -102,7 +103,7 @@ func TestNewCORS(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			mw := middleware.NewCORS(testCase.allowedOrigins)
+			mw := middleware.NewCORS(mux.NewRouter(), testCase.config)
 			handler := mw.Middleware(testCase.nextHandler)
 
 			w := httptest.NewRecorder()
