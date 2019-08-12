@@ -216,6 +216,3 @@ func getAllowedHTTPMethods() slice.StringSlice {
 		http.MethodTrace,
 	}
 }
-
-// TODO: deal with OPTIONS request (CORS/ACAO/ACAM/ACAH) ==> CORS Middleware
-// TODO: add possibility to configure CORS

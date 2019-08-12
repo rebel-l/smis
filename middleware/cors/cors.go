@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rebel-l/go-utils/slice"
+
 	"github.com/gorilla/mux"
 )
 
@@ -20,6 +22,9 @@ const (
 
 	// HeaderACMA header key for Access-Control-Max-Age
 	HeaderACMA = "Access-Control-Max-Age"
+
+	// HeaderACRM header key for Access-Control-Request-Method
+	HeaderACRM = "Access-Control-Request-Method"
 
 	// AccessControlMaxAgeDefault is the default max age of ACA* headers in seconds
 	AccessControlMaxAgeDefault = 86400
@@ -44,14 +49,17 @@ func (c *cors) handler(next http.Handler) http.Handler {
 
 		origin := request.Header.Get("Origin")
 		if c.Config.AccessControlAllowOrigins.IsIn(origin) || c.Config.AccessControlAllowOrigins.IsIn("*") {
+			// origin
 			writer.Header().Set(HeaderACAO, origin)
-			writer.Header().Set(HeaderACAM, "GET") // TODO: get them dynamically from Router
+
+			// methods
+			writer.Header().Set(HeaderACAM, c.getMethods(request))
+
+			// header
 			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessContolAllowHeaders, ","))
-			maxAge := c.Config.AccessControlMaxAge
-			if maxAge <= 0 {
-				maxAge = AccessControlMaxAgeDefault
-			}
-			writer.Header().Set(HeaderACMA, fmt.Sprint(maxAge))
+
+			// max age
+			writer.Header().Set(HeaderACMA, c.getMaxAge())
 		}
 
 		if request.Method == http.MethodOptions {
@@ -60,4 +68,40 @@ func (c *cors) handler(next http.Handler) http.Handler {
 			next.ServeHTTP(writer, request)
 		}
 	})
+}
+
+func (c *cors) getMaxAge() string {
+	maxAge := c.Config.AccessControlMaxAge
+	if maxAge <= 0 {
+		maxAge = AccessControlMaxAgeDefault
+	}
+	return fmt.Sprint(maxAge)
+}
+
+func (c *cors) getMethods(request *http.Request) string {
+	var methods slice.StringSlice
+
+	reqMethod := request.Header.Get(HeaderACRM)
+	if reqMethod == "" {
+		reqMethod = request.Method
+	}
+	simReq := &http.Request{
+		Method:     reqMethod,
+		URL:        request.URL,
+		RequestURI: request.RequestURI,
+	}
+
+	routerMatch := &mux.RouteMatch{}
+	if c.Router.Match(simReq, routerMatch) && routerMatch.MatchErr == nil {
+		var err error
+		methods, err = routerMatch.Route.GetMethods()
+		if err != nil {
+			return ""
+		}
+	}
+
+	if methods == nil || methods.IsNotIn(http.MethodOptions) {
+		methods = append(methods, http.MethodOptions)
+	}
+	return strings.Join(methods, ",")
 }

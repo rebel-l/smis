@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rebel-l/go-utils/slice"
-
 	"github.com/gorilla/mux"
+
+	"github.com/rebel-l/go-utils/slice"
 
 	"github.com/rebel-l/smis/middleware/cors"
 
@@ -33,8 +33,13 @@ func TestNewCORS(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	router := mux.NewRouter()
+	router.HandleFunc("/", func(_ http.ResponseWriter, _ *http.Request) {}).
+		Methods(http.MethodPost, http.MethodGet)
+
 	reqOptions := httptest.NewRequest(http.MethodOptions, "/", nil)
 	reqOptions.Header.Set("Origin", "http://example.com")
+	reqOptions.Header.Set(cors.HeaderACRM, http.MethodPost)
 
 	reqPost := httptest.NewRequest(http.MethodPost, "/", nil)
 	reqPost.Header.Set("Origin", "http://example.com")
@@ -58,7 +63,7 @@ func TestNewCORS(t *testing.T) {
 			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "GET",
+			expectedMethods: "POST,GET,OPTIONS",
 			expectedHeaders: "*",
 			expectedMaxAge:  "86400",
 		},
@@ -80,7 +85,7 @@ func TestNewCORS(t *testing.T) {
 			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "GET",
+			expectedMethods: "POST,GET,OPTIONS",
 			expectedHeaders: "token",
 			expectedMaxAge:  "10",
 		},
@@ -93,7 +98,7 @@ func TestNewCORS(t *testing.T) {
 			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "GET",
+			expectedMethods: "POST,GET,OPTIONS",
 			expectedHeaders: "token,custom",
 			expectedMaxAge:  "86400",
 		},
@@ -112,7 +117,7 @@ func TestNewCORS(t *testing.T) {
 			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "GET",
+			expectedMethods: "POST,GET,OPTIONS",
 			expectedHeaders: "Content-type",
 			expectedMaxAge:  "86400",
 		},
@@ -120,7 +125,7 @@ func TestNewCORS(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			mw := cors.New(mux.NewRouter(), testCase.config)
+			mw := cors.New(router, testCase.config)
 			handler := mw.Middleware(testCase.nextHandler)
 
 			w := httptest.NewRecorder()
