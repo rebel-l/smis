@@ -1,6 +1,6 @@
-//go:generate mockgen -destination mocks/http_mock/responseWriter.go -package http_mock net/http ResponseWriter
-//go:generate mockgen -destination mocks/logrus_mock/fieldlogger.go -package logrus_mock github.com/sirupsen/logrus FieldLogger
-//go:generate mockgen -destination mocks/smis_mock/smis.go -package smis_mock github.com/rebel-l/smis Server
+//go:generate mockgen -destination ./tests/mocks/http_mock/responseWriter.go -package http_mock net/http ResponseWriter
+//go:generate mockgen -destination ./tests/mocks/logrus_mock/fieldlogger.go -package logrus_mock github.com/sirupsen/logrus FieldLogger
+//go:generate mockgen -destination ./tests/mocks/smis_mock/smis.go -package smis_mock github.com/rebel-l/smis Server
 
 package smis
 
@@ -12,13 +12,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/gorilla/mux"
 
-	"github.com/rebel-l/smis/mocks/http_mock"
-	"github.com/rebel-l/smis/mocks/logrus_mock"
-	"github.com/rebel-l/smis/mocks/smis_mock"
-
-	"github.com/golang/mock/gomock"
+	"github.com/rebel-l/smis/tests/mocks/http_mock"
+	"github.com/rebel-l/smis/tests/mocks/logrus_mock"
+	"github.com/rebel-l/smis/tests/mocks/smis_mock"
 
 	"github.com/sirupsen/logrus"
 )
