@@ -1,4 +1,4 @@
-package middleware
+package cors
 
 import "github.com/rebel-l/go-utils/slice"
 

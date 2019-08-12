@@ -1,6 +1,6 @@
 //go:generate mockgen -destination ./../tests/mocks/http_mock/handler.go -package http_mock net/http Handler
 
-package middleware_test
+package cors_test
 
 import (
 	"net/http"
@@ -9,10 +9,10 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/rebel-l/smis/middleware/cors"
+
 	"github.com/golang/mock/gomock"
 	"github.com/rebel-l/smis/tests/mocks/http_mock"
-
-	"github.com/rebel-l/smis/middleware"
 )
 
 func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
@@ -40,7 +40,7 @@ func TestNewCORS(t *testing.T) {
 	testCases := []struct {
 		name            string
 		request         *http.Request
-		config          middleware.Config
+		config          cors.Config
 		nextHandler     http.Handler
 		expectedOrigin  string
 		expectedMethods string
@@ -50,7 +50,7 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:            "options - allow",
 			request:         reqOptions,
-			config:          middleware.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
+			config:          cors.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -60,13 +60,13 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:        "options - forbidden",
 			request:     reqOptions,
-			config:      middleware.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			config:      cors.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
 			nextHandler: createOptionsHanlder(ctrl),
 		},
 		{
 			name:            "options - allow *",
 			request:         reqOptions,
-			config:          middleware.Config{AccessControlAllowOrigins: []string{"*"}},
+			config:          cors.Config{AccessControlAllowOrigins: []string{"*"}},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -76,7 +76,7 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:            "post - allow",
 			request:         reqPost,
-			config:          middleware.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
+			config:          cors.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -86,13 +86,13 @@ func TestNewCORS(t *testing.T) {
 		{
 			name:        "post - forbidden",
 			request:     reqPost,
-			config:      middleware.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			config:      cors.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
 			nextHandler: createHandler(ctrl),
 		},
 		{
 			name:            "post - allow *",
 			request:         reqPost,
-			config:          middleware.Config{AccessControlAllowOrigins: []string{"*"}},
+			config:          cors.Config{AccessControlAllowOrigins: []string{"*"}},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -103,7 +103,7 @@ func TestNewCORS(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			mw := middleware.NewCORS(mux.NewRouter(), testCase.config)
+			mw := cors.New(mux.NewRouter(), testCase.config)
 			handler := mw.Middleware(testCase.nextHandler)
 
 			w := httptest.NewRecorder()
@@ -113,22 +113,22 @@ func TestNewCORS(t *testing.T) {
 				t.Fatalf("failed to close body: %s", err)
 			}
 
-			origin := resp.Header.Get(middleware.HeaderACAO)
+			origin := resp.Header.Get(cors.HeaderACAO)
 			if testCase.expectedOrigin != origin {
 				t.Errorf("expected origin to be '%s' but got '%s'", testCase.expectedOrigin, origin)
 			}
 
-			methods := resp.Header.Get(middleware.HeaderACAM)
+			methods := resp.Header.Get(cors.HeaderACAM)
 			if testCase.expectedMethods != methods {
 				t.Errorf("expected methods to be '%s' but got '%s'", testCase.expectedMethods, methods)
 			}
 
-			headers := resp.Header.Get(middleware.HeaderACAH)
+			headers := resp.Header.Get(cors.HeaderACAH)
 			if testCase.expectedHeaders != headers {
 				t.Errorf("expected headers to be '%s' but got '%s'", testCase.expectedHeaders, headers)
 			}
 
-			maxAge := resp.Header.Get(middleware.HeaderACMA)
+			maxAge := resp.Header.Get(cors.HeaderACMA)
 			if testCase.expectedMaxAge != maxAge {
 				t.Errorf("expected max age to be '%s' but got '%s'", testCase.expectedMaxAge, maxAge)
 			}

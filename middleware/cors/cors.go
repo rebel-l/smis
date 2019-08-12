@@ -1,4 +1,4 @@
-package middleware
+package cors
 
 import (
 	"fmt"
@@ -29,8 +29,8 @@ type cors struct {
 	Router *mux.Router
 }
 
-// NewCORS returns a middleware to handle CORS requests
-func NewCORS(router *mux.Router, config Config) mux.MiddlewareFunc {
+// New returns a middleware to handle CORS requests
+func New(router *mux.Router, config Config) mux.MiddlewareFunc {
 	middleware := &cors{Config: config, Router: router}
 	return middleware.handler
 }
