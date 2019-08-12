@@ -16,6 +16,8 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/rebel-l/go-utils/slice"
+	"github.com/rebel-l/smis/middleware/cors"
 	"github.com/rebel-l/smis/tests/mocks/http_mock"
 	"github.com/rebel-l/smis/tests/mocks/logrus_mock"
 	"github.com/rebel-l/smis/tests/mocks/smis_mock"
@@ -614,4 +616,182 @@ func Test_NotAllowed_Error(t *testing.T) {
 	writerMock.EXPECT().Write(gomock.Any()).Return(0, errMsg)
 	req := httptest.NewRequest(http.MethodPut, "/notAllowed", nil)
 	service.methodNotAllowedHandler(writerMock, req)
+}
+
+func TestService_WithDefaultMiddleware(t *testing.T) {
+	expectedOrigin := "http://example.com"
+	expectedMethods := "POST,OPTIONS"
+	expectedHeaders := ""
+	expectedMaxAge := "86400"
+	expectedBody := "created"
+
+	cfg := cors.Config{
+		AccessControlAllowOrigins: slice.StringSlice{expectedOrigin},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/new", nil)
+	req.Header.Set(cors.HeaderOrigin, expectedOrigin)
+
+	service, err := NewService(&http.Server{}, logrus.New())
+	if err != nil {
+		t.Errorf("expect no error but got: %s", err)
+	}
+	_, err = service.WithDefaultMiddleware(cfg).
+		RegisterEndpoint("/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+
+			if _, err = writer.Write([]byte(expectedBody)); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+	w := httptest.NewRecorder()
+	service.Router.ServeHTTP(w, req)
+	resp := w.Result()
+
+	// check header
+	gotOrigin := w.Header().Get(cors.HeaderACAO)
+	if expectedOrigin != gotOrigin {
+		t.Errorf("expected origin '%s' but got '%s'", expectedOrigin, gotOrigin)
+	}
+
+	gotHeaders := w.Header().Get(cors.HeaderACAH)
+	if expectedHeaders != gotHeaders {
+		t.Errorf("expected header '%s' but got '%s'", expectedHeaders, gotHeaders)
+	}
+
+	gotMethods := w.Header().Get(cors.HeaderACAM)
+	if expectedMethods != gotMethods {
+		t.Errorf("expected methods '%s' but got '%s'", expectedMethods, gotMethods)
+	}
+
+	gotMaxAge := w.Header().Get(cors.HeaderACMA)
+	if expectedMaxAge != gotMaxAge {
+		t.Errorf("expected max age '%s' but got '%s'", expectedMaxAge, gotMaxAge)
+	}
+
+	// check body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read body: %s", err)
+	}
+
+	if err = resp.Body.Close(); err != nil {
+		t.Fatalf("failed to close body: %s", err)
+	}
+
+	if expectedBody != string(body) {
+		t.Errorf("expectedf body to be '%s' but got '%s'", expectedBody, string(body))
+	}
+}
+
+func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
+	origin := "http://www.example.com"
+	cfg := cors.Config{
+		AccessControlAllowOrigins: slice.StringSlice{origin},
+	}
+
+	service, err := NewService(&http.Server{}, logrus.New())
+	if err != nil {
+		t.Errorf("expect no error but got: %s", err)
+	}
+	service.WithDefaultMiddlewareForPRChain(cfg)
+	_, err = service.RegisterEndpointToPublicChain(
+		"/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+
+			if _, err = writer.Write([]byte("public")); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	_, err = service.RegisterEndpointToRestictedChain(
+		"/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+			if _, err = writer.Write([]byte("restricted")); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	reqPublic := httptest.NewRequest(http.MethodPost, "/public/new", nil)
+	reqPublic.Header.Set(cors.HeaderOrigin, origin)
+
+	reqRestricted := httptest.NewRequest(http.MethodPost, "/restricted/new", nil)
+	reqRestricted.Header.Set(cors.HeaderOrigin, origin)
+
+	testCases := []struct {
+		name            string
+		expectedOrigin  string
+		expectedMethods string
+		expectedHeaders string
+		expectedMaxAge  string
+		expectedBody    string
+		request         *http.Request
+	}{
+		{
+			name:            "public",
+			request:         reqPublic,
+			expectedOrigin:  origin,
+			expectedMethods: "POST,OPTIONS",
+			expectedHeaders: "",
+			expectedMaxAge:  "86400",
+			expectedBody:    "public",
+		},
+		{
+			name:            "restricted",
+			request:         reqRestricted,
+			expectedOrigin:  origin,
+			expectedMethods: "POST,OPTIONS",
+			expectedHeaders: "",
+			expectedMaxAge:  "86400",
+			expectedBody:    "restricted",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			service.Router.ServeHTTP(w, testCase.request)
+			resp := w.Result()
+
+			// check header
+			gotOrigin := w.Header().Get(cors.HeaderACAO)
+			if testCase.expectedOrigin != gotOrigin {
+				t.Errorf("expected origin '%s' but got '%s'", testCase.expectedOrigin, gotOrigin)
+			}
+
+			gotHeaders := w.Header().Get(cors.HeaderACAH)
+			if testCase.expectedHeaders != gotHeaders {
+				t.Errorf("expected header '%s' but got '%s'", testCase.expectedHeaders, gotHeaders)
+			}
+
+			gotMethods := w.Header().Get(cors.HeaderACAM)
+			if testCase.expectedMethods != gotMethods {
+				t.Errorf("expected methods '%s' but got '%s'", testCase.expectedMethods, gotMethods)
+			}
+
+			gotMaxAge := w.Header().Get(cors.HeaderACMA)
+			if testCase.expectedMaxAge != gotMaxAge {
+				t.Errorf("expected max age '%s' but got '%s'", testCase.expectedMaxAge, gotMaxAge)
+			}
+
+			// check body
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
+			}
+
+			if testCase.expectedBody != string(body) {
+				t.Errorf("expectedf body to be '%s' but got '%s'", testCase.expectedBody, string(body))
+			}
+		})
+	}
 }

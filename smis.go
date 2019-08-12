@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/rebel-l/go-utils/slice"
+	"github.com/rebel-l/smis/middleware/cors"
 
 	"github.com/sirupsen/logrus"
 )
@@ -167,6 +168,21 @@ func (s *Service) ListenAndServe() error {
 		return err
 	}
 	return s.Server.ListenAndServe()
+}
+
+// WithDefaultMiddleware initializes the recommended middleware for the default middleware chain.
+func (s *Service) WithDefaultMiddleware(config cors.Config) *Service {
+	s.AddMiddlewareForDefaultChain(cors.New(s.Router, config))
+	return s
+}
+
+// WithDefaultMiddlewareForPRChain initializes the recommended middleware for the public & restricted middleware chain.
+func (s *Service) WithDefaultMiddlewareForPRChain(config cors.Config) *Service {
+	mCORS := cors.New(s.Router, config)
+	s.AddMiddlewareForPublicChain(mCORS)
+	s.AddMiddlewareForRestrictedChain(mCORS)
+
+	return s
 }
 
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
