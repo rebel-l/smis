@@ -38,11 +38,11 @@ func TestNewCORS(t *testing.T) {
 		Methods(http.MethodPost, http.MethodGet)
 
 	reqOptions := httptest.NewRequest(http.MethodOptions, "/", nil)
-	reqOptions.Header.Set("Origin", "http://example.com")
+	reqOptions.Header.Set(cors.HeaderOrigin, "http://example.com")
 	reqOptions.Header.Set(cors.HeaderACRM, http.MethodPost)
 
 	reqPost := httptest.NewRequest(http.MethodPost, "/", nil)
-	reqPost.Header.Set("Origin", "http://example.com")
+	reqPost.Header.Set(cors.HeaderOrigin, "http://example.com")
 
 	testCases := []struct {
 		name            string

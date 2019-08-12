@@ -11,23 +11,26 @@ import (
 )
 
 const (
-	// HeaderACAO header key for Access-Control-Allow-Origin
-	HeaderACAO = "Access-Control-Allow-Origin"
-
-	// HeaderACAM header key for Access-Control-Allow-Methods
-	HeaderACAM = "Access-Control-Allow-Methods"
-
-	// HeaderACAH header key for Access-Control-Allow-Headers
-	HeaderACAH = "Access-Control-Allow-Headers"
-
-	// HeaderACMA header key for Access-Control-Max-Age
-	HeaderACMA = "Access-Control-Max-Age"
-
-	// HeaderACRM header key for Access-Control-Request-Method
-	HeaderACRM = "Access-Control-Request-Method"
-
 	// AccessControlMaxAgeDefault is the default max age of ACA* headers in seconds
 	AccessControlMaxAgeDefault = 86400
+
+	// HeaderACAO is the header key for Access-Control-Allow-Origin
+	HeaderACAO = "Access-Control-Allow-Origin"
+
+	// HeaderACAM is the header key for Access-Control-Allow-Methods
+	HeaderACAM = "Access-Control-Allow-Methods"
+
+	// HeaderACAH is the header key for Access-Control-Allow-Headers
+	HeaderACAH = "Access-Control-Allow-Headers"
+
+	// HeaderACMA is the header key for Access-Control-Max-Age
+	HeaderACMA = "Access-Control-Max-Age"
+
+	// HeaderACRM is the header key for Access-Control-Request-Method
+	HeaderACRM = "Access-Control-Request-Method"
+
+	// HeaderOrigin is the header key for Origin
+	HeaderOrigin = "Origin"
 )
 
 type cors struct {
@@ -47,7 +50,7 @@ func (c *cors) handler(next http.Handler) http.Handler {
 		// an ACA* header for all method even if the content type is the standard form.
 		// All other known browsers do correctly the OPTIONS request.
 
-		origin := request.Header.Get("Origin")
+		origin := request.Header.Get(HeaderOrigin)
 		if c.Config.AccessControlAllowOrigins.IsIn(origin) || c.Config.AccessControlAllowOrigins.IsIn("*") {
 			// origin
 			writer.Header().Set(HeaderACAO, origin)
