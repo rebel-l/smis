@@ -96,11 +96,7 @@ func (c *cors) getMethods(request *http.Request) string {
 
 	routerMatch := &mux.RouteMatch{}
 	if c.Router.Match(simReq, routerMatch) && routerMatch.MatchErr == nil {
-		var err error
-		methods, err = routerMatch.Route.GetMethods()
-		if err != nil {
-			return ""
-		}
+		methods, _ = routerMatch.Route.GetMethods() //nolint:gosec
 	}
 
 	if methods == nil || methods.IsNotIn(http.MethodOptions) {
