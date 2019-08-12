@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rebel-l/go-utils/slice"
+
 	"github.com/gorilla/mux"
 
 	"github.com/rebel-l/smis/middleware/cors"
@@ -48,9 +50,12 @@ func TestNewCORS(t *testing.T) {
 		expectedMaxAge  string
 	}{
 		{
-			name:            "options - allow",
-			request:         reqOptions,
-			config:          cors.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
+			name:    "options - allow",
+			request: reqOptions,
+			config: cors.Config{
+				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
+				AccessContolAllowHeaders:  slice.StringSlice{"*"},
+			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
@@ -58,45 +63,56 @@ func TestNewCORS(t *testing.T) {
 			expectedMaxAge:  "86400",
 		},
 		{
-			name:        "options - forbidden",
-			request:     reqOptions,
-			config:      cors.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			name:    "options - forbidden",
+			request: reqOptions,
+			config: cors.Config{
+				AccessControlAllowOrigins: slice.StringSlice{"http://example.com:80"},
+			},
 			nextHandler: createOptionsHanlder(ctrl),
 		},
 		{
-			name:            "options - allow *",
-			request:         reqOptions,
-			config:          cors.Config{AccessControlAllowOrigins: []string{"*"}},
+			name:    "options - allow *",
+			request: reqOptions,
+			config: cors.Config{
+				AccessControlAllowOrigins: slice.StringSlice{"*"},
+				AccessContolAllowHeaders:  slice.StringSlice{"token"},
+			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
-			expectedHeaders: "*",
+			expectedHeaders: "token",
 			expectedMaxAge:  "86400",
 		},
 		{
-			name:            "post - allow",
-			request:         reqPost,
-			config:          cors.Config{AccessControlAllowOrigins: []string{"http://example.com"}},
+			name:    "post - allow",
+			request: reqPost,
+			config: cors.Config{
+				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
+				AccessContolAllowHeaders:  slice.StringSlice{"token", "custom"},
+			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
-			expectedHeaders: "*",
+			expectedHeaders: "token,custom",
 			expectedMaxAge:  "86400",
 		},
 		{
 			name:        "post - forbidden",
 			request:     reqPost,
-			config:      cors.Config{AccessControlAllowOrigins: []string{"http://example.com:80"}},
+			config:      cors.Config{AccessControlAllowOrigins: slice.StringSlice{"http://example.com:80"}},
 			nextHandler: createHandler(ctrl),
 		},
 		{
-			name:            "post - allow *",
-			request:         reqPost,
-			config:          cors.Config{AccessControlAllowOrigins: []string{"*"}},
+			name:    "post - allow *",
+			request: reqPost,
+			config: cors.Config{
+				AccessControlAllowOrigins: slice.StringSlice{"*"},
+				AccessContolAllowHeaders:  slice.StringSlice{"Content-type"},
+			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
 			expectedMethods: "GET",
-			expectedHeaders: "*",
+			expectedHeaders: "Content-type",
 			expectedMaxAge:  "86400",
 		},
 	}

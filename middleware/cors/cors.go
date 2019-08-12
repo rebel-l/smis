@@ -3,6 +3,7 @@ package cors
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -44,8 +45,8 @@ func (c *cors) handler(next http.Handler) http.Handler {
 		origin := request.Header.Get("Origin")
 		if c.Config.AccessControlAllowOrigins.IsIn(origin) || c.Config.AccessControlAllowOrigins.IsIn("*") {
 			writer.Header().Set(HeaderACAO, origin)
-			writer.Header().Set(HeaderACAM, "GET")                                  // TODO: get them dynamically from Router
-			writer.Header().Set(HeaderACAH, "*")                                    // TODO: should be configurable
+			writer.Header().Set(HeaderACAM, "GET") // TODO: get them dynamically from Router
+			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessContolAllowHeaders, ","))
 			writer.Header().Set(HeaderACMA, fmt.Sprint(AccessControlMaxAgeDefault)) // TODO: should be configurable
 		}
 
