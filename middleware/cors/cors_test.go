@@ -29,7 +29,7 @@ func createOptionsHanlder(ctrl *gomock.Controller) *http_mock.MockHandler {
 	return handler
 }
 
-func TestNewCORS(t *testing.T) {
+func TestNew(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
