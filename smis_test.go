@@ -12,6 +12,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rebel-l/smis/middleware/requestid"
+
 	"github.com/golang/mock/gomock"
 
 	"github.com/gorilla/mux"
@@ -651,6 +653,11 @@ func TestService_WithDefaultMiddleware(t *testing.T) {
 	resp := w.Result()
 
 	// check header
+	gotRequestID := w.Header().Get(requestid.HeaderRID)
+	if gotRequestID == "" {
+		t.Error("request ID in header should not be empty")
+	}
+
 	gotOrigin := w.Header().Get(cors.HeaderACAO)
 	if expectedOrigin != gotOrigin {
 		t.Errorf("expected origin '%s' but got '%s'", expectedOrigin, gotOrigin)
@@ -725,31 +732,31 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
 	reqRestricted.Header.Set(cors.HeaderOrigin, origin)
 
 	testCases := []struct {
-		name            string
-		expectedOrigin  string
-		expectedMethods string
-		expectedHeaders string
-		expectedMaxAge  string
-		expectedBody    string
-		request         *http.Request
+		name               string
+		expectedACAOrigin  string
+		expectedACAMethods string
+		expectedACAHeaders string
+		expectedACAMaxAge  string
+		expectedBody       string
+		request            *http.Request
 	}{
 		{
-			name:            "public",
-			request:         reqPublic,
-			expectedOrigin:  origin,
-			expectedMethods: "POST,OPTIONS",
-			expectedHeaders: "",
-			expectedMaxAge:  "86400",
-			expectedBody:    "public",
+			name:               "public",
+			request:            reqPublic,
+			expectedACAOrigin:  origin,
+			expectedACAMethods: "POST,OPTIONS",
+			expectedACAHeaders: "",
+			expectedACAMaxAge:  "86400",
+			expectedBody:       "public",
 		},
 		{
-			name:            "restricted",
-			request:         reqRestricted,
-			expectedOrigin:  origin,
-			expectedMethods: "POST,OPTIONS",
-			expectedHeaders: "",
-			expectedMaxAge:  "86400",
-			expectedBody:    "restricted",
+			name:               "restricted",
+			request:            reqRestricted,
+			expectedACAOrigin:  origin,
+			expectedACAMethods: "POST,OPTIONS",
+			expectedACAHeaders: "",
+			expectedACAMaxAge:  "86400",
+			expectedBody:       "restricted",
 		},
 	}
 	for _, testCase := range testCases {
@@ -759,24 +766,29 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
 			resp := w.Result()
 
 			// check header
+			gotRequestID := w.Header().Get(requestid.HeaderRID)
+			if gotRequestID == "" {
+				t.Error("request ID in header should not be empty")
+			}
+
 			gotOrigin := w.Header().Get(cors.HeaderACAO)
-			if testCase.expectedOrigin != gotOrigin {
-				t.Errorf("expected origin '%s' but got '%s'", testCase.expectedOrigin, gotOrigin)
+			if testCase.expectedACAOrigin != gotOrigin {
+				t.Errorf("expected origin '%s' but got '%s'", testCase.expectedACAOrigin, gotOrigin)
 			}
 
 			gotHeaders := w.Header().Get(cors.HeaderACAH)
-			if testCase.expectedHeaders != gotHeaders {
-				t.Errorf("expected header '%s' but got '%s'", testCase.expectedHeaders, gotHeaders)
+			if testCase.expectedACAHeaders != gotHeaders {
+				t.Errorf("expected header '%s' but got '%s'", testCase.expectedACAHeaders, gotHeaders)
 			}
 
 			gotMethods := w.Header().Get(cors.HeaderACAM)
-			if testCase.expectedMethods != gotMethods {
-				t.Errorf("expected methods '%s' but got '%s'", testCase.expectedMethods, gotMethods)
+			if testCase.expectedACAMethods != gotMethods {
+				t.Errorf("expected methods '%s' but got '%s'", testCase.expectedACAMethods, gotMethods)
 			}
 
 			gotMaxAge := w.Header().Get(cors.HeaderACMA)
-			if testCase.expectedMaxAge != gotMaxAge {
-				t.Errorf("expected max age '%s' but got '%s'", testCase.expectedMaxAge, gotMaxAge)
+			if testCase.expectedACAMaxAge != gotMaxAge {
+				t.Errorf("expected max age '%s' but got '%s'", testCase.expectedACAMaxAge, gotMaxAge)
 			}
 
 			// check body

@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rebel-l/smis/middleware"
+
+	"github.com/rebel-l/smis/middleware/requestid"
+
 	"github.com/gorilla/mux"
 
 	"github.com/rebel-l/go-utils/slice"
@@ -172,17 +176,38 @@ func (s *Service) ListenAndServe() error {
 
 // WithDefaultMiddleware initializes the recommended middleware for the default middleware chain.
 func (s *Service) WithDefaultMiddleware(config cors.Config) *Service {
-	s.AddMiddlewareForDefaultChain(cors.New(s.Router, config))
+	mw := s.GetDefaultMiddleware(config)
+
+	//nolint:gosec
+	_ = mw.Walk(func(middleware mux.MiddlewareFunc) error {
+		s.AddMiddlewareForDefaultChain(middleware)
+		return nil
+	})
 	return s
 }
 
 // WithDefaultMiddlewareForPRChain initializes the recommended middleware for the public & restricted middleware chain.
 func (s *Service) WithDefaultMiddlewareForPRChain(config cors.Config) *Service {
-	mCORS := cors.New(s.Router, config)
-	s.AddMiddlewareForPublicChain(mCORS)
-	s.AddMiddlewareForRestrictedChain(mCORS)
+	mw := s.GetDefaultMiddleware(config)
+
+	//nolint:gosec
+	_ = mw.Walk(func(middleware mux.MiddlewareFunc) error {
+		s.AddMiddlewareForPublicChain(middleware)
+		s.AddMiddlewareForRestrictedChain(middleware)
+		return nil
+	})
 
 	return s
+}
+
+// GetDefaultMiddleware returns the default middleware every chain should have.
+func (s *Service) GetDefaultMiddleware(config cors.Config) middleware.Slice {
+	var mw middleware.Slice
+
+	mw = append(mw, requestid.New())
+	mw = append(mw, cors.New(s.Router, config))
+
+	return mw
 }
 
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
