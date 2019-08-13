@@ -6,10 +6,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/golang/mock/gomock"
-	"github.com/rebel-l/smis/tests/mocks/http_mock"
 
 	"github.com/rebel-l/smis/middleware/requestid"
+	"github.com/rebel-l/smis/tests/mocks/http_mock"
+	"github.com/rebel-l/smis/tests/mocks/logrus_mock"
+
+	"github.com/sirupsen/logrus"
 )
 
 func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
@@ -21,7 +26,21 @@ func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
 func TestNew(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mw := requestid.New()
+	// we are not able to return mock from logrus.WithField(), so we simulate an Entry
+	entry := &logrus.Entry{
+		Logger: logrus.New(),
+		Data: logrus.Fields{
+			string(requestid.ContextKeyRequestID): uuid.New(),
+		},
+	}
+
+	logMock := logrus_mock.NewMockFieldLogger(ctrl)
+	logMock.EXPECT().
+		WithField(gomock.Eq(string(requestid.ContextKeyRequestID)), gomock.Any()).
+		Times(1).
+		Return(entry)
+
+	mw := requestid.New(logMock)
 	handler := mw.Middleware(createHandler(ctrl))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))

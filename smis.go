@@ -204,7 +204,7 @@ func (s *Service) WithDefaultMiddlewareForPRChain(config cors.Config) *Service {
 func (s *Service) GetDefaultMiddleware(config cors.Config) middleware.Slice {
 	var mw middleware.Slice
 
-	mw = append(mw, requestid.New())
+	mw = append(mw, requestid.New(s.Log))
 	mw = append(mw, cors.New(s.Router, config))
 
 	return mw
