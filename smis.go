@@ -42,7 +42,7 @@ type Service struct {
 }
 
 // NewService returns an initialized service struct
-func NewService(server Server, log logrus.FieldLogger) (*Service, error) {
+func NewService(server Server, router *mux.Router, log logrus.FieldLogger) (*Service, error) {
 	if server == nil {
 		return nil, fmt.Errorf("server should not be nil")
 	}
@@ -53,7 +53,7 @@ func NewService(server Server, log logrus.FieldLogger) (*Service, error) {
 
 	service := &Service{
 		Log:    log,
-		Router: mux.NewRouter(),
+		Router: router,
 		Server: server,
 	}
 	service.Router.NotFoundHandler = http.HandlerFunc(service.notFoundHandler)

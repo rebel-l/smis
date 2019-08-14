@@ -58,7 +58,7 @@ func TestNewService(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			_, err := NewService(testcase.server, testcase.log)
+			_, err := NewService(testcase.server, mux.NewRouter(), testcase.log)
 
 			if testcase.err == nil && err != nil {
 				t.Errorf("expected no error but got '%s'", err.Error())
@@ -135,7 +135,7 @@ func TestService_ServeHTTP(t *testing.T) {
 		Times(1).
 		Return(entry)
 
-	service, err := NewService(&http.Server{}, m)
+	service, err := NewService(&http.Server{}, mux.NewRouter(), m)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
@@ -427,12 +427,12 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
 
 	m := logrus_mock.NewMockFieldLogger(ctrl)
 
-	serviceDefault, err := NewService(&http.Server{}, m)
+	serviceDefault, err := NewService(&http.Server{}, mux.NewRouter(), m)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	serviceSubRouters, err := NewService(&http.Server{}, m)
+	serviceSubRouters, err := NewService(&http.Server{}, mux.NewRouter(), m)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
@@ -542,7 +542,7 @@ func TestService_ListenAndServe(t *testing.T) {
 	logMockSuccess := logrus_mock.NewMockFieldLogger(ctrl)
 	logMockSuccess.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
 
-	serviceSuccess, err := NewService(serverMockSuccess, logMockSuccess)
+	serviceSuccess, err := NewService(serverMockSuccess, mux.NewRouter(), logMockSuccess)
 	if err != nil {
 		t.Fatalf("failed to create server: %s", err)
 	}
@@ -557,7 +557,7 @@ func TestService_ListenAndServe(t *testing.T) {
 	logMockError := logrus_mock.NewMockFieldLogger(ctrl)
 	logMockError.EXPECT().Infof(gomock.Any(), gomock.Any()).Times(0)
 
-	serviceError, err := NewService(serverMockError, logMockError)
+	serviceError, err := NewService(serverMockError, mux.NewRouter(), logMockError)
 	if err != nil {
 		t.Fatalf("failed to create server: %s", err)
 	}
@@ -610,7 +610,7 @@ func Test_NotFound_Error(t *testing.T) {
 		Errorf(gomock.Eq("notFoundHandler failed to send response: %s"), gomock.Eq(errMsg)).
 		Times(1)
 
-	service, err := NewService(&http.Server{}, logMock)
+	service, err := NewService(&http.Server{}, mux.NewRouter(), logMock)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
@@ -634,7 +634,7 @@ func Test_NotAllowed_Error(t *testing.T) {
 		Errorf(gomock.Eq("notAllowedHandler failed to send response: %s"), gomock.Eq(errMsg)).
 		Times(1)
 
-	service, err := NewService(&http.Server{}, logMock)
+	service, err := NewService(&http.Server{}, mux.NewRouter(), logMock)
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
@@ -661,7 +661,7 @@ func TestService_WithDefaultMiddleware(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/new", nil)
 	req.Header.Set(cors.HeaderOrigin, expectedOrigin)
 
-	service, err := NewService(&http.Server{}, logrus.New())
+	service, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
 	if err != nil {
 		t.Errorf("expect no error but got: %s", err)
 	}
@@ -726,7 +726,7 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
 		AccessControlAllowOrigins: slice.StringSlice{origin},
 	}
 
-	service, err := NewService(&http.Server{}, logrus.New())
+	service, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
 	if err != nil {
 		t.Errorf("expect no error but got: %s", err)
 	}
