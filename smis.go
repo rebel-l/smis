@@ -2,18 +2,17 @@
 package smis
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/rebel-l/smis/middleware"
-
-	"github.com/rebel-l/smis/middleware/requestid"
-
 	"github.com/gorilla/mux"
 
 	"github.com/rebel-l/go-utils/slice"
+	"github.com/rebel-l/smis/middleware"
 	"github.com/rebel-l/smis/middleware/cors"
+	"github.com/rebel-l/smis/middleware/requestid"
 
 	"github.com/sirupsen/logrus"
 )
@@ -208,6 +207,12 @@ func (s *Service) GetDefaultMiddleware(config cors.Config) middleware.Slice {
 	mw = append(mw, cors.New(s.Router, config))
 
 	return mw
+}
+
+// NewLogForRequestID returns a new logger with field request ID for better debugging / tracing request. This works
+// only if requestid middleware generated a request id before, otherwise the field for request ID would be empty
+func (s *Service) NewLogForRequestID(ctx context.Context) logrus.FieldLogger {
+	return requestid.NewLoggerFromContext(ctx, s.Log)
 }
 
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {

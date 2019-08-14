@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rebel-l/smis/middleware/requestid"
+	"github.com/google/uuid"
 
 	"github.com/golang/mock/gomock"
 
@@ -20,6 +20,7 @@ import (
 
 	"github.com/rebel-l/go-utils/slice"
 	"github.com/rebel-l/smis/middleware/cors"
+	"github.com/rebel-l/smis/middleware/requestid"
 	"github.com/rebel-l/smis/tests/mocks/http_mock"
 	"github.com/rebel-l/smis/tests/mocks/logrus_mock"
 	"github.com/rebel-l/smis/tests/mocks/smis_mock"
@@ -119,8 +120,20 @@ func TestService_ServeHTTP(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// we are not able to return mock from logrus.WithField(), so we simulate an Entry
+	entry := &logrus.Entry{
+		Logger: logrus.New(),
+		Data: logrus.Fields{
+			string(requestid.ContextKeyRequestID): uuid.New(),
+		},
+	}
+
 	m := logrus_mock.NewMockFieldLogger(ctrl)
 	m.EXPECT().Warnf(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	m.EXPECT().
+		WithField(gomock.Eq(string(requestid.ContextKeyRequestID)), gomock.Any()).
+		Times(1).
+		Return(entry)
 
 	service, err := NewService(&http.Server{}, m)
 	if err != nil {
@@ -161,6 +174,14 @@ func TestService_ServeHTTP(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to write response: %s", err)
 				}
+			},
+		},
+		{
+			path:   "/requestID",
+			method: http.MethodGet,
+			handler: func(writer http.ResponseWriter, request *http.Request) {
+				log := service.NewLogForRequestID(request.Context())
+				log.Info("just a log entry")
 			},
 		},
 	}
@@ -337,7 +358,7 @@ func TestService_ServeHTTP(t *testing.T) {
 			expectedBody:   "method not allowed, please check response headers for allowed methods",
 		},
 		{
-			name:           "user endpoint - GET - not implemented",
+			name:           "user endpoint - DELETE - not implemented",
 			request:        httptest.NewRequest(http.MethodDelete, "/user/", nil),
 			expectedStatus: "404 Not Found",
 			expectedHeader: headerSkip,
@@ -356,6 +377,12 @@ func TestService_ServeHTTP(t *testing.T) {
 			expectedStatus: "404 Not Found",
 			expectedHeader: headerSkip,
 			expectedBody:   "404 page not found\n",
+		},
+		{
+			name:           "requestID endpoint - GET",
+			request:        httptest.NewRequest(http.MethodGet, "/requestID", nil),
+			expectedStatus: "200 OK",
+			expectedHeader: headerSkip,
 		},
 	}
 
