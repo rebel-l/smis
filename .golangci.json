@@ -6,6 +6,12 @@
           "lll"
         ],
         "source": "^//go:generate "
+      },
+      {
+        "path": "_test.go",
+        "linters": [
+          "gomnd"
+        ]
       }
     ],
     "exclude-use-default": false,
