@@ -16,5 +16,6 @@ func (s Slice) Walk(f WalkCallback) error {
 			return err
 		}
 	}
+
 	return nil
 }

@@ -67,7 +67,6 @@ func TestResponse_WriteJSON(t *testing.T) {
 }
 
 func TestResponse_WriteJSON_Error(t *testing.T) {
-
 	testCases := []struct {
 		name string
 		log  bool

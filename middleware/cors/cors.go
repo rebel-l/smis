@@ -78,6 +78,7 @@ func (c *cors) getMaxAge() string {
 	if maxAge <= 0 {
 		maxAge = AccessControlMaxAgeDefault
 	}
+
 	return fmt.Sprint(maxAge)
 }
 
@@ -88,6 +89,7 @@ func (c *cors) getMethods(request *http.Request) string {
 	if reqMethod == "" {
 		reqMethod = request.Method
 	}
+
 	simReq := &http.Request{
 		Method:     reqMethod,
 		URL:        request.URL,
@@ -102,5 +104,6 @@ func (c *cors) getMethods(request *http.Request) string {
 	if methods == nil || methods.IsNotIn(http.MethodOptions) {
 		methods = append(methods, http.MethodOptions)
 	}
+
 	return strings.Join(methods, ",")
 }

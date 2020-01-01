@@ -66,6 +66,7 @@ func NewService(server Server, router *mux.Router, log logrus.FieldLogger) (*Ser
 // If a chain doesn't exist, it creates it.
 func (s *Service) GetRouterForMiddlewareChain(chain string) *mux.Router {
 	var router *mux.Router
+
 	switch chain {
 	case MiddlewareChainDefault:
 		router = s.Router
@@ -76,11 +77,13 @@ func (s *Service) GetRouterForMiddlewareChain(chain string) *mux.Router {
 
 		var ok bool
 		router, ok = s.SubRouters[chain]
+
 		if !ok {
 			router = s.Router.PathPrefix("/" + chain).Subrouter()
 			s.SubRouters[chain] = router
 		}
 	}
+
 	return router
 }
 
@@ -109,41 +112,34 @@ func (s *Service) AddMiddlewareForRestrictedChain(middleware mux.MiddlewareFunc)
 
 // RegisterEndpoint registers a handler at the router for the given method and path.
 // In case the method is not known an error is returned, otherwise a *Route.
-func (s *Service) RegisterEndpoint(
-	path, method string, f http.HandlerFunc) (*mux.Route, error) {
-
+func (s *Service) RegisterEndpoint(path, method string, f http.HandlerFunc) (*mux.Route, error) {
 	return s.RegisterEndpointToChain(MiddlewareChainDefault, path, method, f)
 }
 
 // RegisterEndpointToPublicChain registers a handler at the router for the given method and path at the public chain.
 // In case the method is not known an error is returned, otherwise a *Route.
-func (s *Service) RegisterEndpointToPublicChain(
-	path, method string, f http.HandlerFunc) (*mux.Route, error) {
-
+func (s *Service) RegisterEndpointToPublicChain(path, method string, f http.HandlerFunc) (*mux.Route, error) {
 	return s.RegisterEndpointToChain(MiddlewareChainPublic, path, method, f)
 }
 
 // RegisterEndpointToRestictedChain registers a handler at the router for the given method and path at the
 // restricted chain.
 // In case the method is not known an error is returned, otherwise a *Route.
-func (s *Service) RegisterEndpointToRestictedChain(
-	path, method string, f http.HandlerFunc) (*mux.Route, error) {
-
+func (s *Service) RegisterEndpointToRestictedChain(path, method string, f http.HandlerFunc) (*mux.Route, error) {
 	return s.RegisterEndpointToChain(MiddlewareChainRestricted, path, method, f)
 }
 
 // RegisterEndpointToChain registers a handler at the router for the given method and path at any chain. You can use
 // your custom chains with this method.
 // In case the method is not known an error is returned, otherwise a *Route.
-func (s *Service) RegisterEndpointToChain(
-	chain, path, method string, f http.HandlerFunc) (*mux.Route, error) {
-
+func (s *Service) RegisterEndpointToChain(chain, path, method string, f http.HandlerFunc) (*mux.Route, error) {
 	methods := getAllowedHTTPMethods()
 	if methods.IsNotIn(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
 
 	router := s.GetRouterForMiddlewareChain(chain)
+
 	return router.HandleFunc(path, f).Methods(method), nil
 }
 
@@ -170,6 +166,7 @@ func (s *Service) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
+
 	return s.Server.ListenAndServe()
 }
 
@@ -182,6 +179,7 @@ func (s *Service) WithDefaultMiddleware(config cors.Config) *Service {
 		s.AddMiddlewareForDefaultChain(middleware)
 		return nil
 	})
+
 	return s
 }
 
@@ -217,7 +215,8 @@ func (s *Service) NewLogForRequestID(ctx context.Context) logrus.FieldLogger {
 
 func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
 	s.Log.Warnf("endpoint not implemented: %s | %s", request.Method, request.RequestURI)
-	writer.WriteHeader(404)
+	writer.WriteHeader(http.StatusNotFound)
+
 	_, err := writer.Write([]byte("endpoint not implemented"))
 	if err != nil {
 		s.Log.Errorf("notFoundHandler failed to send response: %s", err)
@@ -228,12 +227,14 @@ func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *h
 	s.Log.Warnf("method not allowed: %s | %s", request.Method, request.RequestURI)
 
 	methods := make([]string, 0)
+
 	for _, m := range getAllowedHTTPMethods() {
 		if request.Method == m {
 			continue
 		}
 
 		simReq := &http.Request{Method: m, URL: request.URL, RequestURI: request.RequestURI}
+
 		match := &mux.RouteMatch{}
 		if !s.Router.Match(simReq, match) || match.MatchErr != nil {
 			continue
@@ -241,8 +242,10 @@ func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *h
 
 		methods = append(methods, m)
 	}
+
 	writer.Header().Add("Allow", strings.Join(methods, ","))
-	writer.WriteHeader(405)
+	writer.WriteHeader(http.StatusMethodNotAllowed)
+
 	_, err := writer.Write([]byte("method not allowed, please check response headers for allowed methods"))
 	if err != nil {
 		s.Log.Errorf("notAllowedHandler failed to send response: %s", err)

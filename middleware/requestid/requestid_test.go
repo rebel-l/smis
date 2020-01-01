@@ -20,6 +20,7 @@ import (
 func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
 	handler := http_mock.NewMockHandler(ctrl)
 	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(1)
+
 	return handler
 }
 
@@ -45,6 +46,7 @@ func TestNew(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	resp := w.Result()
+
 	header := resp.Header.Get(requestid.HeaderRID)
 	if header == "" {
 		t.Errorf("header should contain %s but it was not set or empty string", requestid.HeaderRID)
@@ -57,6 +59,7 @@ func TestNew(t *testing.T) {
 
 func TestGetID(t *testing.T) {
 	ctx := context.Background()
+
 	res := requestid.GetID(ctx)
 	if res != "" {
 		t.Errorf("context which didn't pass the middleware should not have a RequestID but got: %s", res)

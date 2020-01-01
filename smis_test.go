@@ -116,7 +116,7 @@ func TestService_RegisterEndpoint_Error(t *testing.T) {
 	}
 }
 
-func TestService_ServeHTTP(t *testing.T) {
+func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -421,7 +421,7 @@ func TestService_ServeHTTP(t *testing.T) {
 	}
 }
 
-func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
+func TestService_ServeHTTP_WithMiddleware(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -448,7 +448,9 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
 			}
 		})
 	}
+
 	serviceDefault.AddMiddlewareForDefaultChain(middlewareDefault)
+
 	_, err = serviceDefault.RegisterEndpoint("/main", http.MethodGet, endpoint)
 	if err != nil {
 		t.Errorf("failed to register endpoint: %s", err)
@@ -463,7 +465,9 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
 			}
 		})
 	}
+
 	serviceSubRouters.AddMiddlewareForPublicChain(middlewarePublic)
+
 	_, err = serviceSubRouters.RegisterEndpointToPublicChain("/weather", http.MethodGet, endpoint)
 	if err != nil {
 		t.Errorf("failed to register endpoint: %s", err)
@@ -478,7 +482,9 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
 			}
 		})
 	}
+
 	serviceSubRouters.AddMiddlewareForRestrictedChain(middlewareRestricted)
+
 	_, err = serviceSubRouters.RegisterEndpointToRestictedChain("/admin", http.MethodGet, endpoint)
 	if err != nil {
 		t.Errorf("failed to register endpoint: %s", err)
@@ -531,7 +537,7 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) {
 	}
 }
 
-func TestService_ListenAndServe(t *testing.T) {
+func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -618,6 +624,7 @@ func Test_NotFound_Error(t *testing.T) {
 	writerMock := http_mock.NewMockResponseWriter(ctrl)
 	writerMock.EXPECT().WriteHeader(404).Times(1)
 	writerMock.EXPECT().Write(gomock.Any()).Return(0, errMsg)
+
 	req := httptest.NewRequest(http.MethodPut, "/something", nil)
 	service.notFoundHandler(writerMock, req)
 }
@@ -643,11 +650,12 @@ func Test_NotAllowed_Error(t *testing.T) {
 	writerMock.EXPECT().WriteHeader(405).Times(1)
 	writerMock.EXPECT().Header().Times(1).Return(http.Header{})
 	writerMock.EXPECT().Write(gomock.Any()).Return(0, errMsg)
+
 	req := httptest.NewRequest(http.MethodPut, "/notAllowed", nil)
 	service.methodNotAllowedHandler(writerMock, req)
 }
 
-func TestService_WithDefaultMiddleware(t *testing.T) {
+func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
 	expectedOrigin := "http://example.com"
 	expectedMethods := "POST,OPTIONS"
 	expectedHeaders := ""
@@ -665,9 +673,9 @@ func TestService_WithDefaultMiddleware(t *testing.T) {
 	if err != nil {
 		t.Errorf("expect no error but got: %s", err)
 	}
+
 	_, err = service.WithDefaultMiddleware(cfg).
 		RegisterEndpoint("/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
-
 			if _, err = writer.Write([]byte(expectedBody)); err != nil {
 				t.Fatalf("failed to send response: %s", err)
 			}
@@ -675,6 +683,7 @@ func TestService_WithDefaultMiddleware(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to register endpoint: %s", err)
 	}
+
 	w := httptest.NewRecorder()
 	service.Router.ServeHTTP(w, req)
 	resp := w.Result()
@@ -720,7 +729,7 @@ func TestService_WithDefaultMiddleware(t *testing.T) {
 	}
 }
 
-func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
+func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funlen, gocognit
 	origin := "http://www.example.com"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: slice.StringSlice{origin},
@@ -730,10 +739,11 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expect no error but got: %s", err)
 	}
+
 	service.WithDefaultMiddlewareForPRChain(cfg)
+
 	_, err = service.RegisterEndpointToPublicChain(
 		"/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
-
 			if _, err = writer.Write([]byte("public")); err != nil {
 				t.Fatalf("failed to send response: %s", err)
 			}
@@ -786,6 +796,7 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) {
 			expectedBody:       "restricted",
 		},
 	}
+
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			w := httptest.NewRecorder()

@@ -20,16 +20,18 @@ import (
 func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
 	handler := http_mock.NewMockHandler(ctrl)
 	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(1)
+
 	return handler
 }
 
 func createOptionsHanlder(ctrl *gomock.Controller) *http_mock.MockHandler {
 	handler := http_mock.NewMockHandler(ctrl)
 	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(0)
+
 	return handler
 }
 
-func TestNew(t *testing.T) {
+func TestNew(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -154,7 +156,6 @@ func TestNew(t *testing.T) {
 			if testCase.expectedMaxAge != maxAge {
 				t.Errorf("expected max age to be '%s' but got '%s'", testCase.expectedMaxAge, maxAge)
 			}
-
 		})
 	}
 }
