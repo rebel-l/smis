@@ -38,10 +38,6 @@ func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload inter
 
 	writer.Header().Set(HeaderKeyContentType, HeaderContentTypeJSON)
 
-	if r == nil {
-		return
-	}
-
 	response, err := json.Marshal(payload)
 	if err != nil {
 		msg := errorJSON{Error: fmt.Sprintf("failed to encode response payload: %v", err)}

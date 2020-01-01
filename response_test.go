@@ -26,7 +26,10 @@ func TestResponse_WriteJSON(t *testing.T) {
 	}{
 		{
 			name:         "response is nil",
-			expectedCode: http.StatusOK,
+			code:         http.StatusNotFound,
+			payload:      struct{}{},
+			expectedCode: http.StatusNotFound,
+			expectedBody: "{}",
 		},
 		{
 			name:   "success",
