@@ -59,6 +59,11 @@ func TestResponse_WriteJSON(t *testing.T) {
 				t.Errorf("expected code %d but got %d", testCase.expectedCode, w.Code)
 			}
 
+			contentType := w.Header().Get(smis.HeaderKeyContentType)
+			if contentType != smis.HeaderContentTypeJSON {
+				t.Errorf("expected content type '%s' but got '%s'", smis.HeaderContentTypeJSON, contentType)
+			}
+
 			if testCase.expectedBody != w.Body.String() {
 				t.Errorf("expected body '%s' but got '%s'", testCase.expectedBody, w.Body.String())
 			}
@@ -97,9 +102,16 @@ func TestResponse_WriteJSON_Error(t *testing.T) {
 
 			respMock := http_mock.NewMockResponseWriter(ctrl)
 			respMock.EXPECT().WriteHeader(http.StatusOK).Times(1)
+			header := http.Header{}
+			respMock.EXPECT().Header().Return(header).Times(1)
 			respMock.EXPECT().Write(gomock.Any()).Return(0, errors.New("fail")).Times(1)
 
 			actual.WriteJSON(respMock, 200, "")
+
+			contentType := header.Get(smis.HeaderKeyContentType)
+			if contentType != smis.HeaderContentTypeJSON {
+				t.Errorf("expected content type '%s' but got '%s'", smis.HeaderContentTypeJSON, contentType)
+			}
 		})
 	}
 }
