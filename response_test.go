@@ -100,18 +100,52 @@ func TestResponse_WriteJSON_Error(t *testing.T) {
 				logMock.EXPECT().Error(gomock.Any()).Times(0)
 			}
 
-			respMock := http_mock.NewMockResponseWriter(ctrl)
-			respMock.EXPECT().WriteHeader(http.StatusOK).Times(1)
+			writerMock := http_mock.NewMockResponseWriter(ctrl)
+			writerMock.EXPECT().WriteHeader(http.StatusOK).Times(1)
 			header := http.Header{}
-			respMock.EXPECT().Header().Return(header).Times(1)
-			respMock.EXPECT().Write(gomock.Any()).Return(0, errors.New("fail")).Times(1)
+			writerMock.EXPECT().Header().Return(header).Times(1)
+			writerMock.EXPECT().Write(gomock.Any()).Return(0, errors.New("fail")).Times(1)
 
-			actual.WriteJSON(respMock, 200, "")
+			actual.WriteJSON(writerMock, 200, "")
 
 			contentType := header.Get(smis.HeaderKeyContentType)
 			if contentType != smis.HeaderContentTypeJSON {
 				t.Errorf("expected content type '%s' but got '%s'", smis.HeaderContentTypeJSON, contentType)
 			}
+		})
+	}
+}
+
+func TestResponse_WriteJSON_NoWriter(t *testing.T) {
+	testCases := []struct {
+		name string
+		log  bool
+	}{
+		{
+			name: "with logger",
+			log:  true,
+		},
+		{
+			name: "without logger",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			actual := &smis.Response{}
+
+			logMock := logrus_mock.NewMockFieldLogger(ctrl)
+			if testCase.log {
+				logMock.EXPECT().Error(gomock.Eq("writer is nil")).Times(1)
+				actual.Log = logMock
+			} else {
+				logMock.EXPECT().Error(gomock.Any()).Times(0)
+			}
+
+			actual.WriteJSON(nil, 200, "")
 		})
 	}
 }

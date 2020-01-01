@@ -31,6 +31,11 @@ func (r *Response) logError(msg string) {
 
 //WriteJSON sends a JSON response with given code and payload
 func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload interface{}) {
+	if writer == nil {
+		r.logError("writer is nil")
+		return
+	}
+
 	writer.Header().Set(HeaderKeyContentType, HeaderContentTypeJSON)
 
 	if r == nil {
