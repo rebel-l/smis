@@ -21,7 +21,9 @@
   "linters": {
     "enable-all": true,
     "disable": [
-      "scopelint"
+      "goerr113",
+      "scopelint",
+      "testpackage"
     ]
   },
   "run": {

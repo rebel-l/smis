@@ -25,13 +25,13 @@ type requestID struct {
 	Log logrus.FieldLogger
 }
 
-// New returns the middleware handler generating the RequestID
+// New returns the middleware handler generating the RequestID.
 func New(log logrus.FieldLogger) mux.MiddlewareFunc {
 	mw := &requestID{Log: log}
 	return mw.handler
 }
 
-// GetID returns the RequestID set to the context. Is empty if the context doesn't contain any RequestID
+// GetID returns the RequestID set to the context. Is empty if the context doesn't contain any RequestID.
 func GetID(ctx context.Context) string {
 	requestID := ctx.Value(ContextKeyRequestID)
 	if res, ok := requestID.(string); ok {

@@ -2,10 +2,10 @@ package middleware
 
 import "github.com/gorilla/mux"
 
-// Slice represents a slice of mux.MiddlewareFunc
+// Slice represents a slice of mux.MiddlewareFunc.
 type Slice []mux.MiddlewareFunc
 
-// WalkCallback represents the callback function executed by the Walk() method
+// WalkCallback represents the callback function executed by the Walk() method.
 type WalkCallback func(middleware mux.MiddlewareFunc) error
 
 // Walk iterates over all elements of the slice and executes the given callback. If a callback throws an error,

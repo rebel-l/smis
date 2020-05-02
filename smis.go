@@ -28,12 +28,12 @@ const (
 	MiddlewareChainRestricted = "restricted"
 )
 
-// Server is an interface to describe how to serve endpoints
+// Server is an interface to describe how to serve endpoints.
 type Server interface {
 	ListenAndServe() error
 }
 
-// Service represents the fields necessary for a service
+// Service represents the fields necessary for a service.
 type Service struct {
 	Log        logrus.FieldLogger
 	Router     *mux.Router
@@ -41,7 +41,7 @@ type Service struct {
 	SubRouters map[string]*mux.Router
 }
 
-// NewService returns an initialized service struct
+// NewService returns an initialized service struct.
 func NewService(server Server, router *mux.Router, log logrus.FieldLogger) (*Service, error) {
 	if server == nil {
 		return nil, fmt.Errorf("server should not be nil")
@@ -88,7 +88,7 @@ func (s *Service) GetRouterForMiddlewareChain(chain string) *mux.Router {
 }
 
 // AddMiddleware adds middleware to a specific chain. You can create custom chains with this method. The chain is
-// also the path prefix, eg. your chain is "custom" your routes will start with "/custom"
+// also the path prefix, eg. your chain is "custom" your routes will start with "/custom".
 func (s *Service) AddMiddleware(chain string, middleware mux.MiddlewareFunc) {
 	router := s.GetRouterForMiddlewareChain(chain)
 	router.Use(middleware)
@@ -143,7 +143,7 @@ func (s *Service) RegisterEndpointToChain(chain, path, method string, f http.Han
 	return router.HandleFunc(path, f).Methods(method), nil
 }
 
-// RegisterFileServer registers a file server to provide static files
+// RegisterFileServer registers a file server to provide static files.
 func (s *Service) RegisterFileServer(path, method, filepath string) (*mux.Route, error) {
 	return s.Router.
 			PathPrefix(path).
@@ -152,7 +152,7 @@ func (s *Service) RegisterFileServer(path, method, filepath string) (*mux.Route,
 		nil
 }
 
-// ListenAndServe registers the catch all route and starts the server
+// ListenAndServe registers the catch all route and starts the server.
 func (s *Service) ListenAndServe() error {
 	err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
 		pathTemplate, err := route.GetPathTemplate()
@@ -174,7 +174,6 @@ func (s *Service) ListenAndServe() error {
 func (s *Service) WithDefaultMiddleware(config cors.Config) *Service {
 	mw := s.GetDefaultMiddleware(config)
 
-	//nolint:gosec
 	_ = mw.Walk(func(middleware mux.MiddlewareFunc) error {
 		s.AddMiddlewareForDefaultChain(middleware)
 		return nil
@@ -187,7 +186,6 @@ func (s *Service) WithDefaultMiddleware(config cors.Config) *Service {
 func (s *Service) WithDefaultMiddlewareForPRChain(config cors.Config) *Service {
 	mw := s.GetDefaultMiddleware(config)
 
-	//nolint:gosec
 	_ = mw.Walk(func(middleware mux.MiddlewareFunc) error {
 		s.AddMiddlewareForPublicChain(middleware)
 		s.AddMiddlewareForRestrictedChain(middleware)
@@ -208,7 +206,7 @@ func (s *Service) GetDefaultMiddleware(config cors.Config) middleware.Slice {
 }
 
 // NewLogForRequestID returns a new logger with field request ID for better debugging / tracing request. This works
-// only if requestid middleware generated a request id before, otherwise the field for request ID would be empty
+// only if requestid middleware generated a request id before, otherwise the field for request ID would be empty.
 func (s *Service) NewLogForRequestID(ctx context.Context) logrus.FieldLogger {
 	return requestid.NewLoggerFromContext(ctx, s.Log)
 }

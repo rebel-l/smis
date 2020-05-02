@@ -16,7 +16,7 @@ const (
 	HeaderContentTypeJSON = "application/json"
 )
 
-//Response provides functions to write http responses
+//Response provides functions to write http responses.
 type Response struct {
 	Log logrus.FieldLogger
 }
@@ -29,7 +29,7 @@ func (r *Response) logError(msg string) {
 	r.Log.Error(msg)
 }
 
-//WriteJSON sends a JSON response with given code and payload
+//WriteJSON sends a JSON response with given code and payload.
 func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload interface{}) {
 	if writer == nil {
 		r.logError("writer is nil")
