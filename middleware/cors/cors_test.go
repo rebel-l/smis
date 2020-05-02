@@ -61,7 +61,7 @@ func TestNew(t *testing.T) { // nolint: funlen
 			request: reqOptions,
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
-				AccessContolAllowHeaders:  slice.StringSlice{"*"},
+				AccessControlAllowHeaders: slice.StringSlice{"*"},
 			},
 			nextHandler:     createOptionsHanlder(ctrl),
 			expectedOrigin:  "http://example.com",
@@ -82,7 +82,7 @@ func TestNew(t *testing.T) { // nolint: funlen
 			request: reqOptions,
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"*"},
-				AccessContolAllowHeaders:  slice.StringSlice{"token"},
+				AccessControlAllowHeaders: slice.StringSlice{"token"},
 				AccessControlMaxAge:       10,
 			},
 			nextHandler:     createOptionsHanlder(ctrl),
@@ -96,7 +96,7 @@ func TestNew(t *testing.T) { // nolint: funlen
 			request: reqPost,
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
-				AccessContolAllowHeaders:  slice.StringSlice{"token", "custom"},
+				AccessControlAllowHeaders: slice.StringSlice{"token", "custom"},
 			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",
@@ -115,7 +115,7 @@ func TestNew(t *testing.T) { // nolint: funlen
 			request: reqPost,
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"*"},
-				AccessContolAllowHeaders:  slice.StringSlice{"Content-type"},
+				AccessControlAllowHeaders: slice.StringSlice{"Content-type"},
 			},
 			nextHandler:     createHandler(ctrl),
 			expectedOrigin:  "http://example.com",

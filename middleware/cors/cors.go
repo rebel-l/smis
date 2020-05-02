@@ -38,7 +38,7 @@ type cors struct {
 	Router *mux.Router
 }
 
-// New returns a middleware to handle CORS requests
+// New returns a middleware to handle CORS requests.
 func New(router *mux.Router, config Config) mux.MiddlewareFunc {
 	middleware := &cors{Config: config, Router: router}
 	return middleware.handler
@@ -59,7 +59,7 @@ func (c *cors) handler(next http.Handler) http.Handler {
 			writer.Header().Set(HeaderACAM, c.getMethods(request))
 
 			// header
-			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessContolAllowHeaders, ","))
+			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessControlAllowHeaders, ","))
 
 			// max age
 			writer.Header().Set(HeaderACMA, c.getMaxAge())
