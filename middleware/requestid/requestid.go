@@ -47,14 +47,14 @@ func (r *requestID) handler(next http.Handler) http.Handler {
 		ctx := attachRequestID(request.Context())
 		request = request.WithContext(ctx)
 		log := NewLoggerFromContext(ctx, r.Log)
-		log.Info("Request start")
+		log.Info("Request start: %s - %s", request.Method, request.RequestURI)
 
 		// handle next
 		next.ServeHTTP(writer, request)
 
 		// add request ID to header
 		writer.Header().Set(HeaderRID, GetID(ctx))
-		log.Info("Request finished")
+		log.Info("Request finished: %s - %s", request.Method, request.RequestURI)
 	})
 }
 
