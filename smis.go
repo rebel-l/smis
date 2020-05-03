@@ -155,11 +155,17 @@ func (s *Service) RegisterFileServer(path, method, filepath string) (*mux.Route,
 // ListenAndServe registers the catch all route and starts the server.
 func (s *Service) ListenAndServe() error {
 	err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		methods, err := route.GetMethods()
+		if err != nil {
+			return err
+		}
+
 		pathTemplate, err := route.GetPathTemplate()
 		if err != nil {
 			return err
 		}
-		s.Log.Infof("Available Route: %s", pathTemplate)
+
+		s.Log.Infof("Available Route: %s - %s", strings.Join(methods, "|"), pathTemplate)
 		return nil
 	})
 

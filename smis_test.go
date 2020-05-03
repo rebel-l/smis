@@ -546,7 +546,11 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	serverMockSuccess.EXPECT().ListenAndServe().Times(1)
 
 	logMockSuccess := logrus_mock.NewMockFieldLogger(ctrl)
-	logMockSuccess.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
+	logMockSuccess.EXPECT().Infof(
+		gomock.Eq("Available Route: %s - %s"),
+		gomock.Eq(http.MethodGet),
+		gomock.Eq("/ping"),
+	).Times(1)
 
 	serviceSuccess, err := NewService(serverMockSuccess, mux.NewRouter(), logMockSuccess)
 	if err != nil {
@@ -554,7 +558,7 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	}
 
 	routeSuccess := serviceSuccess.Router.NewRoute()
-	routeSuccess.Path("/ping")
+	routeSuccess.Path("/ping").Methods(http.MethodGet)
 
 	// error
 	serverMockError := smis_mock.NewMockServer(ctrl)
