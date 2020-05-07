@@ -163,6 +163,8 @@ github.com/rebel-l/go-utils v0.6.0 h1:W/B105S7lYiDwCt8zaZHNG+L69wYqJVNigQ0dS/X8H
 github.com/rebel-l/go-utils v0.6.0/go.mod h1:ExzTGa68C31pf9IKNrAUE+UZsqBlMRfGAwzayjjefrU=
 github.com/rebel-l/go-utils v0.11.0 h1:5PSOAlkLxFyOm9Ay0k3Sq88IwVeZ6u2ZiKRsyF+Ewm0=
 github.com/rebel-l/go-utils v0.11.0/go.mod h1:6w3o+Nx+4M3TzPrKsb4Cojkf3WQKO3RPOqGUO+6sRPw=
+github.com/rebel-l/go-utils v1.1.0 h1:HO9nmpDXe4TCWhwdpU3CgOvyswOjl68b1xS5PnCoLgc=
+github.com/rebel-l/go-utils v1.1.0/go.mod h1:6w3o+Nx+4M3TzPrKsb4Cojkf3WQKO3RPOqGUO+6sRPw=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.3.2/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
