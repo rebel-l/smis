@@ -210,10 +210,10 @@ func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 	headerPlain["Content-type"] = "text/plain; charset=utf-8"
 
 	headerNotAllowed := make(map[string]string)
-	headerNotAllowed["Allow"] = "OPTIONS,GET"
+	headerNotAllowed["Allow"] = "GET,OPTIONS"
 
 	headerNotAllowed2 := make(map[string]string)
-	headerNotAllowed2["Allow"] = "OPTIONS,POST,PUT"
+	headerNotAllowed2["Allow"] = "POST,PUT,OPTIONS"
 
 	testcases := []struct {
 		name           string
@@ -553,7 +553,7 @@ func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) {
 	expectedAC := map[string]string{
 		cors.HeaderACAO: origin,
 		cors.HeaderACAH: header,
-		cors.HeaderACAM: "OPTIONS,PUT",
+		cors.HeaderACAM: "PUT,OPTIONS",
 	}
 
 	// 1. OPTIONS preflight
@@ -627,7 +627,7 @@ func TestService_ServeHTTP_DefaultMiddlewareForPRChain_Preflight(t *testing.T) {
 	expectedAC := map[string]string{
 		cors.HeaderACAO: origin,
 		cors.HeaderACAH: header,
-		cors.HeaderACAM: "OPTIONS,PUT",
+		cors.HeaderACAM: "PUT,OPTIONS",
 	}
 
 	testCases := []struct {
@@ -926,7 +926,7 @@ func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
 	expectedAC := map[string]string{
 		cors.HeaderACAO: expectedOrigin,
 		cors.HeaderACAH: expectedHeaders,
-		cors.HeaderACAM: "OPTIONS,POST",
+		cors.HeaderACAM: "POST,OPTIONS",
 	}
 	expectedBody := "created"
 
@@ -1024,7 +1024,7 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funl
 			name:               "public",
 			request:            reqPublic,
 			expectedACAOrigin:  origin,
-			expectedACAMethods: "OPTIONS,POST",
+			expectedACAMethods: "POST,OPTIONS",
 			expectedACAHeaders: "",
 			expectedACAMaxAge:  "86400",
 			expectedBody:       "public",
@@ -1033,7 +1033,7 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funl
 			name:               "restricted",
 			request:            reqRestricted,
 			expectedACAOrigin:  origin,
-			expectedACAMethods: "OPTIONS,POST",
+			expectedACAMethods: "POST,OPTIONS",
 			expectedACAHeaders: "",
 			expectedACAMaxAge:  "86400",
 			expectedBody:       "restricted",
