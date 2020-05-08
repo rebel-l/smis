@@ -3,30 +3,23 @@
 package cors_test
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/gorilla/mux"
 
 	"github.com/rebel-l/go-utils/slice"
-
 	"github.com/rebel-l/smis/middleware/cors"
-
-	"github.com/golang/mock/gomock"
 	"github.com/rebel-l/smis/tests/mocks/http_mock"
 )
 
-func createHandler(ctrl *gomock.Controller) *http_mock.MockHandler {
+func createMockHandler(ctrl *gomock.Controller, times int) *http_mock.MockHandler {
 	handler := http_mock.NewMockHandler(ctrl)
-	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(1)
-
-	return handler
-}
-
-func createOptionsHanlder(ctrl *gomock.Controller) *http_mock.MockHandler {
-	handler := http_mock.NewMockHandler(ctrl)
-	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(0)
+	handler.EXPECT().ServeHTTP(gomock.Any(), gomock.Any()).Times(times)
 
 	return handler
 }
@@ -51,10 +44,12 @@ func TestNew(t *testing.T) { // nolint: funlen
 		request         *http.Request
 		config          cors.Config
 		nextHandler     http.Handler
+		expectedCode    int
 		expectedOrigin  string
 		expectedMethods string
 		expectedHeaders string
 		expectedMaxAge  string
+		expectedBody    string
 	}{
 		{
 			name:    "options - allow",
@@ -63,9 +58,10 @@ func TestNew(t *testing.T) { // nolint: funlen
 				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
 				AccessControlAllowHeaders: slice.StringSlice{"*"},
 			},
-			nextHandler:     createOptionsHanlder(ctrl),
+			nextHandler:     createMockHandler(ctrl, 0),
+			expectedCode:    http.StatusNoContent,
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "POST,GET,OPTIONS",
+			expectedMethods: "OPTIONS,GET,POST",
 			expectedHeaders: "*",
 			expectedMaxAge:  "86400",
 		},
@@ -75,7 +71,9 @@ func TestNew(t *testing.T) { // nolint: funlen
 			config: cors.Config{
 				AccessControlAllowOrigins: slice.StringSlice{"http://example.com:80"},
 			},
-			nextHandler: createOptionsHanlder(ctrl),
+			nextHandler:  createMockHandler(ctrl, 0),
+			expectedCode: http.StatusForbidden,
+			expectedBody: "access from origin forbidden",
 		},
 		{
 			name:    "options - allow *",
@@ -85,9 +83,10 @@ func TestNew(t *testing.T) { // nolint: funlen
 				AccessControlAllowHeaders: slice.StringSlice{"token"},
 				AccessControlMaxAge:       10,
 			},
-			nextHandler:     createOptionsHanlder(ctrl),
+			nextHandler:     createMockHandler(ctrl, 0),
+			expectedCode:    http.StatusNoContent,
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "POST,GET,OPTIONS",
+			expectedMethods: "OPTIONS,GET,POST",
 			expectedHeaders: "token",
 			expectedMaxAge:  "10",
 		},
@@ -98,17 +97,20 @@ func TestNew(t *testing.T) { // nolint: funlen
 				AccessControlAllowOrigins: slice.StringSlice{"http://example.com"},
 				AccessControlAllowHeaders: slice.StringSlice{"token", "custom"},
 			},
-			nextHandler:     createHandler(ctrl),
+			nextHandler:     createMockHandler(ctrl, 1),
+			expectedCode:    http.StatusOK,
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "POST,GET,OPTIONS",
+			expectedMethods: "OPTIONS,GET,POST",
 			expectedHeaders: "token,custom",
 			expectedMaxAge:  "86400",
 		},
 		{
-			name:        "post - forbidden",
-			request:     reqPost,
-			config:      cors.Config{AccessControlAllowOrigins: slice.StringSlice{"http://example.com:80"}},
-			nextHandler: createHandler(ctrl),
+			name:         "post - forbidden",
+			request:      reqPost,
+			config:       cors.Config{AccessControlAllowOrigins: slice.StringSlice{"http://example.com:80"}},
+			nextHandler:  createMockHandler(ctrl, 0),
+			expectedCode: http.StatusForbidden,
+			expectedBody: "access from origin forbidden",
 		},
 		{
 			name:    "post - allow *",
@@ -117,9 +119,10 @@ func TestNew(t *testing.T) { // nolint: funlen
 				AccessControlAllowOrigins: slice.StringSlice{"*"},
 				AccessControlAllowHeaders: slice.StringSlice{"Content-type"},
 			},
-			nextHandler:     createHandler(ctrl),
+			nextHandler:     createMockHandler(ctrl, 1),
+			expectedCode:    http.StatusOK,
 			expectedOrigin:  "http://example.com",
-			expectedMethods: "POST,GET,OPTIONS",
+			expectedMethods: "OPTIONS,GET,POST",
 			expectedHeaders: "Content-type",
 			expectedMaxAge:  "86400",
 		},
@@ -133,10 +136,27 @@ func TestNew(t *testing.T) { // nolint: funlen
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, testCase.request)
 			resp := w.Result()
+
+			// Assert Code
+			if testCase.expectedCode != resp.StatusCode {
+				t.Errorf("expected code %d but got %d", testCase.expectedCode, resp.StatusCode)
+			}
+
+			// Assert Body
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+
+			if testCase.expectedBody != string(body) {
+				t.Errorf("expected body to be '%s' but got '%s'", testCase.expectedBody, string(body))
+			}
+
 			if err := resp.Body.Close(); err != nil {
 				t.Fatalf("failed to close body: %s", err)
 			}
 
+			// Assert Header
 			origin := resp.Header.Get(cors.HeaderACAO)
 			if testCase.expectedOrigin != origin {
 				t.Errorf("expected origin to be '%s' but got '%s'", testCase.expectedOrigin, origin)

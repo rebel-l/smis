@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rebel-l/go-utils/slice"
+	"github.com/rebel-l/smis/libs"
 
 	"github.com/gorilla/mux"
 )
@@ -46,9 +46,9 @@ func New(router *mux.Router, config Config) mux.MiddlewareFunc {
 
 func (c *cors) handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		// Safari, MSIE & MS Edge doesn't follow the defined CORS flow yet and expect
+		// Safari, MSIE & MS Etch doesn't follow the defined CORS flow yet and expect
 		// an ACA* header for all method even if the content type is the standard form.
-		// All other known browsers do correctly the OPTIONS request.
+		// All other known browsers do correctly the OPTIONS preflight request.
 
 		origin := request.Header.Get(HeaderOrigin)
 		if c.Config.AccessControlAllowOrigins.IsIn(origin) || c.Config.AccessControlAllowOrigins.IsIn("*") {
@@ -56,20 +56,27 @@ func (c *cors) handler(next http.Handler) http.Handler {
 			writer.Header().Set(HeaderACAO, origin)
 
 			// methods
-			writer.Header().Set(HeaderACAM, c.getMethods(request))
+			methods := libs.GetMethodsForCurrentURI(request, c.Router)
+			writer.Header().Set(HeaderACAM, methods.String())
 
 			// header
 			writer.Header().Set(HeaderACAH, strings.Join(c.Config.AccessControlAllowHeaders, ","))
 
 			// max age
 			writer.Header().Set(HeaderACMA, c.getMaxAge())
+
+			if request.Method == http.MethodOptions {
+				writer.WriteHeader(http.StatusNoContent)
+			} else {
+				next.ServeHTTP(writer, request)
+			}
+
+			return
 		}
 
-		if request.Method == http.MethodOptions {
-			writer.WriteHeader(http.StatusNoContent)
-		} else {
-			next.ServeHTTP(writer, request)
-		}
+		// Acces not allowed because of wrong origin
+		writer.WriteHeader(http.StatusForbidden)
+		_, _ = writer.Write([]byte("access from origin forbidden"))
 	})
 }
 
@@ -80,30 +87,4 @@ func (c *cors) getMaxAge() string {
 	}
 
 	return fmt.Sprint(maxAge)
-}
-
-func (c *cors) getMethods(request *http.Request) string {
-	var methods slice.StringSlice
-
-	reqMethod := request.Header.Get(HeaderACRM)
-	if reqMethod == "" {
-		reqMethod = request.Method
-	}
-
-	simReq := &http.Request{
-		Method:     reqMethod,
-		URL:        request.URL,
-		RequestURI: request.RequestURI,
-	}
-
-	routerMatch := &mux.RouteMatch{}
-	if c.Router.Match(simReq, routerMatch) && routerMatch.MatchErr == nil {
-		methods, _ = routerMatch.Route.GetMethods()
-	}
-
-	if methods == nil || methods.IsNotIn(http.MethodOptions) {
-		methods = append(methods, http.MethodOptions)
-	}
-
-	return strings.Join(methods, ",")
 }
