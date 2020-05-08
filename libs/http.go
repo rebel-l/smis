@@ -13,7 +13,9 @@ func GetMethodsForCurrentURI(request *http.Request, router *mux.Router) slice.St
 	var methods slice.StringSlice
 
 	possibleMethods := GetAllowedHTTPMethods()
-	possibleMethods = append(possibleMethods, http.MethodOptions) // OPTIONS is the default preflight method and is reserved
+
+	// OPTIONS is the default preflight method and is reserved
+	possibleMethods = append(possibleMethods, http.MethodOptions)
 
 	for _, m := range possibleMethods {
 		simReq := &http.Request{Method: m, URL: request.URL, RequestURI: request.RequestURI}

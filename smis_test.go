@@ -28,6 +28,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const origin = "https://example.com"
+
 func TestNewService(t *testing.T) {
 	testcases := []struct {
 		name   string
@@ -121,7 +123,7 @@ func TestService_RegisterEndpoint_Error(t *testing.T) {
 	}
 }
 
-func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
+func TestService_ServeHTTP(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -526,13 +528,12 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) { // nolint: funlen
 	}
 }
 
-func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) {
+func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) { // nolint: funlen
 	svc, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	origin := "https://example.com"
 	header := "*"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: []string{origin},
@@ -559,6 +560,7 @@ func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) {
 	// 1. OPTIONS preflight
 	request := httptest.NewRequest(http.MethodOptions, "/myEndpoint", nil)
 	request.Header.Set(cors.HeaderOrigin, origin)
+
 	writer := httptest.NewRecorder()
 
 	svc.Router.ServeHTTP(writer, request)
@@ -578,6 +580,7 @@ func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) {
 	// 2. PUT requests
 	request = httptest.NewRequest(http.MethodPut, "/myEndpoint", nil)
 	request.Header.Set(cors.HeaderOrigin, origin)
+
 	writer = httptest.NewRecorder()
 	svc.Router.ServeHTTP(writer, request)
 
@@ -595,13 +598,12 @@ func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) {
 	}
 }
 
-func TestService_ServeHTTP_DefaultMiddlewareForPRChain_Preflight(t *testing.T) {
+func TestService_ServeHTTP_DefaultMiddlewareForPRChain_Preflight(t *testing.T) { // nolint: funlen
 	svc, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
 	if err != nil {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	origin := "https://example.com"
 	header := "*"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: []string{origin},
@@ -695,7 +697,6 @@ func TestService_WithDefaultMiddleware_WrongOrigin(t *testing.T) {
 		t.Fatalf("failed to create service: %s", err)
 	}
 
-	origin := "https://example.com"
 	header := "*"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: []string{origin},
@@ -723,6 +724,7 @@ func TestService_WithDefaultMiddleware_WrongOrigin(t *testing.T) {
 	// 2. PUT requests
 	request := httptest.NewRequest(http.MethodPost, "/myEndpoint", nil)
 	request.Header.Set(cors.HeaderOrigin, "https://different.com")
+
 	writer := httptest.NewRecorder()
 	svc.Router.ServeHTTP(writer, request)
 
@@ -761,6 +763,7 @@ func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[s
 
 	// ACAH
 	acah := header.Get(cors.HeaderACAH)
+
 	expectedACAH, ok := expected[cors.HeaderACAH]
 	if !ok {
 		t.Errorf("no expectation for ACAH set")
@@ -770,6 +773,7 @@ func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[s
 
 	// ACAM
 	acam := header.Get(cors.HeaderACAM)
+
 	expectedACAM, ok := expected[cors.HeaderACAM]
 	if !ok {
 		t.Errorf("no expectation for ACAM set")
@@ -779,6 +783,7 @@ func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[s
 
 	// ACAO
 	acao := header.Get(cors.HeaderACAO)
+
 	expectedACAO, ok := expected[cors.HeaderACAO]
 	if !ok {
 		t.Errorf("no expectation for ACAO set")
@@ -788,6 +793,7 @@ func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[s
 
 	// ACMA
 	acma := header.Get(cors.HeaderACMA)
+
 	expectedACMA, ok := expected[cors.HeaderACMA]
 	if !ok {
 		expectedACMA = fmt.Sprintf("%d", cors.AccessControlMaxAgeDefault)
@@ -920,7 +926,7 @@ func Test_NotAllowed_Error(t *testing.T) {
 	service.methodNotAllowedHandler(writerMock, req)
 }
 
-func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
+func TestService_WithDefaultMiddleware(t *testing.T) {
 	expectedOrigin := "http://example.com"
 	expectedHeaders := ""
 	expectedAC := map[string]string{
@@ -972,7 +978,7 @@ func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
 	}
 }
 
-func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funlen, gocognit
+func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funlen
 	origin := "http://www.example.com"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: slice.StringSlice{origin},
