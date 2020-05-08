@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/rebel-l/go-utils/slice"
+	"github.com/rebel-l/smis/libs"
 	"github.com/rebel-l/smis/middleware"
 	"github.com/rebel-l/smis/middleware/cors"
 	"github.com/rebel-l/smis/middleware/requestid"
@@ -133,12 +133,15 @@ func (s *Service) RegisterEndpointToRestictedChain(path, method string, f http.H
 // your custom chains with this method.
 // In case the method is not known an error is returned, otherwise a *Route.
 func (s *Service) RegisterEndpointToChain(chain, path, method string, f http.HandlerFunc) (*mux.Route, error) {
-	methods := getAllowedHTTPMethods()
+	methods := libs.GetAllowedHTTPMethods()
 	if methods.IsNotIn(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
 
 	router := s.GetRouterForMiddlewareChain(chain)
+
+	// OPTIONS method must be always added as it is required by preflight of browsers
+	_ = router.HandleFunc(path, func(_ http.ResponseWriter, _ *http.Request) {}).Methods(http.MethodOptions)
 
 	return router.HandleFunc(path, f).Methods(method), nil
 }
@@ -155,11 +158,17 @@ func (s *Service) RegisterFileServer(path, method, filepath string) (*mux.Route,
 // ListenAndServe registers the catch all route and starts the server.
 func (s *Service) ListenAndServe() error {
 	err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		methods, err := route.GetMethods()
+		if err != nil {
+			return err
+		}
+
 		pathTemplate, err := route.GetPathTemplate()
 		if err != nil {
 			return err
 		}
-		s.Log.Infof("Available Route: %s", pathTemplate)
+
+		s.Log.Infof("Available Route: %s - %s", strings.Join(methods, "|"), pathTemplate)
 		return nil
 	})
 
@@ -224,42 +233,12 @@ func (s *Service) notFoundHandler(writer http.ResponseWriter, request *http.Requ
 func (s *Service) methodNotAllowedHandler(writer http.ResponseWriter, request *http.Request) {
 	s.Log.Warnf("method not allowed: %s | %s", request.Method, request.RequestURI)
 
-	methods := make([]string, 0)
-
-	for _, m := range getAllowedHTTPMethods() {
-		if request.Method == m {
-			continue
-		}
-
-		simReq := &http.Request{Method: m, URL: request.URL, RequestURI: request.RequestURI}
-
-		match := &mux.RouteMatch{}
-		if !s.Router.Match(simReq, match) || match.MatchErr != nil {
-			continue
-		}
-
-		methods = append(methods, m)
-	}
-
-	writer.Header().Add("Allow", strings.Join(methods, ","))
+	methods := libs.GetMethodsForCurrentURI(request, s.Router).String()
+	writer.Header().Add("Allow", methods)
 	writer.WriteHeader(http.StatusMethodNotAllowed)
 
 	_, err := writer.Write([]byte("method not allowed, please check response headers for allowed methods"))
 	if err != nil {
 		s.Log.Errorf("notAllowedHandler failed to send response: %s", err)
-	}
-}
-
-func getAllowedHTTPMethods() slice.StringSlice {
-	return slice.StringSlice{
-		http.MethodConnect,
-		http.MethodDelete,
-		http.MethodGet,
-		http.MethodHead,
-		http.MethodOptions,
-		http.MethodPatch,
-		http.MethodPost,
-		http.MethodPut,
-		http.MethodTrace,
 	}
 }

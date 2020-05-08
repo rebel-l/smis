@@ -28,6 +28,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const origin = "https://example.com"
+
 func TestNewService(t *testing.T) {
 	testcases := []struct {
 		name   string
@@ -95,6 +97,11 @@ func TestService_RegisterEndpoint_Error(t *testing.T) {
 			method: "spiderman",
 			path:   "/something",
 		},
+		{
+			name:   "method OPTIONS and path",
+			method: http.MethodOptions,
+			path:   "/some_option",
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -116,7 +123,7 @@ func TestService_RegisterEndpoint_Error(t *testing.T) {
 	}
 }
 
-func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
+func TestService_ServeHTTP(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -205,10 +212,10 @@ func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 	headerPlain["Content-type"] = "text/plain; charset=utf-8"
 
 	headerNotAllowed := make(map[string]string)
-	headerNotAllowed["Allow"] = "GET"
+	headerNotAllowed["Allow"] = "GET,OPTIONS"
 
 	headerNotAllowed2 := make(map[string]string)
-	headerNotAllowed2["Allow"] = "POST,PUT"
+	headerNotAllowed2["Allow"] = "POST,PUT,OPTIONS"
 
 	testcases := []struct {
 		name           string
@@ -255,9 +262,8 @@ func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 		{
 			name:           "health endpoint - OPTIONS",
 			request:        httptest.NewRequest(http.MethodOptions, "/health", nil),
-			expectedStatus: "405 Method Not Allowed",
-			expectedHeader: headerNotAllowed,
-			expectedBody:   "method not allowed, please check response headers for allowed methods",
+			expectedStatus: "200 OK",
+			expectedHeader: headerSkip,
 		},
 		{
 			name:           "health endpoint - PATCH",
@@ -330,18 +336,10 @@ func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 			expectedBody:   "method not allowed, please check response headers for allowed methods",
 		},
 		{
-			name:           "user endpoint - HEAF",
-			request:        httptest.NewRequest(http.MethodHead, "/user/3", nil),
-			expectedStatus: "405 Method Not Allowed",
-			expectedHeader: headerNotAllowed2,
-			expectedBody:   "method not allowed, please check response headers for allowed methods",
-		},
-		{
 			name:           "user endpoint - OPTIONS",
 			request:        httptest.NewRequest(http.MethodOptions, "/user/3", nil),
-			expectedStatus: "405 Method Not Allowed",
-			expectedHeader: headerNotAllowed2,
-			expectedBody:   "method not allowed, please check response headers for allowed methods",
+			expectedStatus: "200 OK",
+			expectedHeader: headerSkip,
 		},
 		{
 			name:           "user endpoint - PATCH",
@@ -406,16 +404,9 @@ func TestService_ServeHTTP(t *testing.T) { // nolint: funlen, gocognit
 			}
 
 			// check body
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatalf("failed to read body: %s", err)
-			}
+			assertBody(t, resp.Body, testcase.expectedBody)
 			if err = resp.Body.Close(); err != nil {
 				t.Fatalf("failed to close body: %s", err)
-			}
-
-			if testcase.expectedBody != string(body) {
-				t.Errorf("expected body to be '%s' but got '%s'", testcase.expectedBody, string(body))
 			}
 		})
 	}
@@ -537,6 +528,282 @@ func TestService_ServeHTTP_WithMiddleware(t *testing.T) { // nolint: funlen
 	}
 }
 
+func TestService_ServeHTTP_DefaultMiddleware_Preflight(t *testing.T) { // nolint: funlen
+	svc, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	header := "*"
+	cfg := cors.Config{
+		AccessControlAllowOrigins: []string{origin},
+		AccessControlAllowHeaders: []string{header},
+	}
+	svc.WithDefaultMiddleware(cfg)
+
+	body := "endpoint"
+	handler := func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(body))
+	}
+
+	_, err = svc.RegisterEndpoint("/myEndpoint", http.MethodPut, handler)
+	if err != nil {
+		t.Fatalf("failed to register endpoint: %s", err)
+	}
+
+	expectedAC := map[string]string{
+		cors.HeaderACAO: origin,
+		cors.HeaderACAH: header,
+		cors.HeaderACAM: "PUT,OPTIONS",
+	}
+
+	// 1. OPTIONS preflight
+	request := httptest.NewRequest(http.MethodOptions, "/myEndpoint", nil)
+	request.Header.Set(cors.HeaderOrigin, origin)
+
+	writer := httptest.NewRecorder()
+
+	svc.Router.ServeHTTP(writer, request)
+
+	resp := writer.Result()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expects status code of OPTIONS prefligt %d but got %d", http.StatusNoContent, resp.StatusCode)
+	}
+
+	assertAccessControlHeaders(t, resp.Header, expectedAC)
+
+	if err = resp.Body.Close(); err != nil {
+		t.Fatalf("failed to read body: %s", err)
+	}
+
+	// 2. PUT requests
+	request = httptest.NewRequest(http.MethodPut, "/myEndpoint", nil)
+	request.Header.Set(cors.HeaderOrigin, origin)
+
+	writer = httptest.NewRecorder()
+	svc.Router.ServeHTTP(writer, request)
+
+	resp = writer.Result()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expects status code of PUT request %d but got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	assertAccessControlHeaders(t, resp.Header, expectedAC)
+	assertBody(t, resp.Body, body)
+
+	if err = resp.Body.Close(); err != nil {
+		t.Fatalf("failed to close body: %s", err)
+	}
+}
+
+func TestService_ServeHTTP_DefaultMiddlewareForPRChain_Preflight(t *testing.T) { // nolint: funlen
+	svc, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	header := "*"
+	cfg := cors.Config{
+		AccessControlAllowOrigins: []string{origin},
+		AccessControlAllowHeaders: []string{header},
+	}
+	svc.WithDefaultMiddlewareForPRChain(cfg)
+
+	body := "endpoint"
+	handler := func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(body))
+	}
+
+	_, err = svc.RegisterEndpointToPublicChain("/publicEndpoint", http.MethodPut, handler)
+	if err != nil {
+		t.Fatalf("failed to register endpoint: %s", err)
+	}
+
+	_, err = svc.RegisterEndpointToRestictedChain("/restrictedEndpoint", http.MethodPut, handler)
+	if err != nil {
+		t.Fatalf("failed to register endpoint: %s", err)
+	}
+
+	expectedAC := map[string]string{
+		cors.HeaderACAO: origin,
+		cors.HeaderACAH: header,
+		cors.HeaderACAM: "PUT,OPTIONS",
+	}
+
+	testCases := []struct {
+		name       string
+		requestURI string
+	}{
+		{
+			name:       "public endpoint",
+			requestURI: "/public/publicEndpoint",
+		},
+		{
+			name:       "restricted endpoint",
+			requestURI: "/restricted/restrictedEndpoint",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// 1. OPTIONS preflight
+			request := httptest.NewRequest(http.MethodOptions, testCase.requestURI, nil)
+			request.Header.Set(cors.HeaderOrigin, origin)
+			writer := httptest.NewRecorder()
+
+			svc.Router.ServeHTTP(writer, request)
+
+			resp := writer.Result()
+
+			if resp.StatusCode != http.StatusNoContent {
+				t.Errorf("expects status code of OPTIONS prefligt %d but got %d", http.StatusNoContent, resp.StatusCode)
+			}
+
+			assertAccessControlHeaders(t, resp.Header, expectedAC)
+
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+
+			// 2. PUT requests
+			request = httptest.NewRequest(http.MethodPut, testCase.requestURI, nil)
+			request.Header.Set(cors.HeaderOrigin, origin)
+			writer = httptest.NewRecorder()
+			svc.Router.ServeHTTP(writer, request)
+
+			resp = writer.Result()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expects status code of PUT request %d but got %d", http.StatusOK, resp.StatusCode)
+			}
+
+			assertAccessControlHeaders(t, resp.Header, expectedAC)
+			assertBody(t, resp.Body, body)
+
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
+			}
+		})
+	}
+}
+
+// TestService_WithDefaultMiddleware_CORS_FailingRoute should ensure that next.Handler is not called
+// if the origin of request header doesn't match.
+func TestService_WithDefaultMiddleware_WrongOrigin(t *testing.T) {
+	svc, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
+	if err != nil {
+		t.Fatalf("failed to create service: %s", err)
+	}
+
+	header := "*"
+	cfg := cors.Config{
+		AccessControlAllowOrigins: []string{origin},
+		AccessControlAllowHeaders: []string{header},
+	}
+	svc.WithDefaultMiddleware(cfg)
+
+	body := "we should not see this"
+	handler := func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(body))
+	}
+
+	_, err = svc.RegisterEndpoint("/myEndpoint", http.MethodPost, handler)
+	if err != nil {
+		t.Fatalf("failed to register endpoint: %s", err)
+	}
+
+	expectedAC := map[string]string{
+		cors.HeaderACAO: "",
+		cors.HeaderACAH: "",
+		cors.HeaderACAM: "",
+		cors.HeaderACMA: "",
+	}
+
+	// 2. PUT requests
+	request := httptest.NewRequest(http.MethodPost, "/myEndpoint", nil)
+	request.Header.Set(cors.HeaderOrigin, "https://different.com")
+
+	writer := httptest.NewRecorder()
+	svc.Router.ServeHTTP(writer, request)
+
+	resp := writer.Result()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expects status code of PUT request %d but got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	assertAccessControlHeaders(t, resp.Header, expectedAC)
+	assertBody(t, resp.Body, "access from origin forbidden")
+
+	if err = resp.Body.Close(); err != nil {
+		t.Fatalf("failed to close body: %s", err)
+	}
+}
+
+func assertBody(t *testing.T, respBody io.ReadCloser, expected string) {
+	t.Helper()
+
+	body, err := ioutil.ReadAll(respBody)
+	if err != nil {
+		t.Fatalf("failed to read body: %s", err)
+	}
+
+	if err = respBody.Close(); err != nil {
+		t.Fatalf("failed to close body: %s", err)
+	}
+
+	if expected != string(body) {
+		t.Errorf("expected body to be '%s' but got '%s'", expected, string(body))
+	}
+}
+
+func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[string]string) {
+	t.Helper()
+
+	// ACAH
+	acah := header.Get(cors.HeaderACAH)
+
+	expectedACAH, ok := expected[cors.HeaderACAH]
+	if !ok {
+		t.Errorf("no expectation for ACAH set")
+	} else if acah != expectedACAH {
+		t.Errorf("expected header ACAH to be '%s' but got '%s'", expectedACAH, acah)
+	}
+
+	// ACAM
+	acam := header.Get(cors.HeaderACAM)
+
+	expectedACAM, ok := expected[cors.HeaderACAM]
+	if !ok {
+		t.Errorf("no expectation for ACAM set")
+	} else if acam != expectedACAM {
+		t.Errorf("expected header ACAM to be '%s' but got '%s'", expectedACAM, acam)
+	}
+
+	// ACAO
+	acao := header.Get(cors.HeaderACAO)
+
+	expectedACAO, ok := expected[cors.HeaderACAO]
+	if !ok {
+		t.Errorf("no expectation for ACAO set")
+	} else if acao != expectedACAO {
+		t.Errorf("expected header ACAO to be '%s' but got '%s'", expectedACAO, acao)
+	}
+
+	// ACMA
+	acma := header.Get(cors.HeaderACMA)
+
+	expectedACMA, ok := expected[cors.HeaderACMA]
+	if !ok {
+		expectedACMA = fmt.Sprintf("%d", cors.AccessControlMaxAgeDefault)
+	}
+
+	if acma != expectedACMA {
+		t.Errorf("expected header ACMA to be %s but got %s", expectedACMA, acma)
+	}
+}
+
 func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -546,7 +813,11 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	serverMockSuccess.EXPECT().ListenAndServe().Times(1)
 
 	logMockSuccess := logrus_mock.NewMockFieldLogger(ctrl)
-	logMockSuccess.EXPECT().Infof(gomock.Eq("Available Route: %s"), gomock.Eq("/ping")).Times(1)
+	logMockSuccess.EXPECT().Infof(
+		gomock.Eq("Available Route: %s - %s"),
+		gomock.Eq(http.MethodGet),
+		gomock.Eq("/ping"),
+	).Times(1)
 
 	serviceSuccess, err := NewService(serverMockSuccess, mux.NewRouter(), logMockSuccess)
 	if err != nil {
@@ -554,7 +825,7 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	}
 
 	routeSuccess := serviceSuccess.Router.NewRoute()
-	routeSuccess.Path("/ping")
+	routeSuccess.Path("/ping").Methods(http.MethodGet)
 
 	// error
 	serverMockError := smis_mock.NewMockServer(ctrl)
@@ -655,11 +926,14 @@ func Test_NotAllowed_Error(t *testing.T) {
 	service.methodNotAllowedHandler(writerMock, req)
 }
 
-func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
+func TestService_WithDefaultMiddleware(t *testing.T) {
 	expectedOrigin := "http://example.com"
-	expectedMethods := "POST,OPTIONS"
 	expectedHeaders := ""
-	expectedMaxAge := "86400"
+	expectedAC := map[string]string{
+		cors.HeaderACAO: expectedOrigin,
+		cors.HeaderACAH: expectedHeaders,
+		cors.HeaderACAM: "POST,OPTIONS",
+	}
 	expectedBody := "created"
 
 	cfg := cors.Config{
@@ -694,42 +968,17 @@ func TestService_WithDefaultMiddleware(t *testing.T) { // nolint: funlen
 		t.Error("request ID in header should not be empty")
 	}
 
-	gotOrigin := w.Header().Get(cors.HeaderACAO)
-	if expectedOrigin != gotOrigin {
-		t.Errorf("expected origin '%s' but got '%s'", expectedOrigin, gotOrigin)
-	}
-
-	gotHeaders := w.Header().Get(cors.HeaderACAH)
-	if expectedHeaders != gotHeaders {
-		t.Errorf("expected header '%s' but got '%s'", expectedHeaders, gotHeaders)
-	}
-
-	gotMethods := w.Header().Get(cors.HeaderACAM)
-	if expectedMethods != gotMethods {
-		t.Errorf("expected methods '%s' but got '%s'", expectedMethods, gotMethods)
-	}
-
-	gotMaxAge := w.Header().Get(cors.HeaderACMA)
-	if expectedMaxAge != gotMaxAge {
-		t.Errorf("expected max age '%s' but got '%s'", expectedMaxAge, gotMaxAge)
-	}
+	assertAccessControlHeaders(t, w.Header(), expectedAC)
 
 	// check body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read body: %s", err)
-	}
+	assertBody(t, resp.Body, expectedBody)
 
 	if err = resp.Body.Close(); err != nil {
 		t.Fatalf("failed to close body: %s", err)
 	}
-
-	if expectedBody != string(body) {
-		t.Errorf("expectedf body to be '%s' but got '%s'", expectedBody, string(body))
-	}
 }
 
-func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funlen, gocognit
+func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funlen
 	origin := "http://www.example.com"
 	cfg := cors.Config{
 		AccessControlAllowOrigins: slice.StringSlice{origin},
@@ -809,38 +1058,17 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funl
 				t.Error("request ID in header should not be empty")
 			}
 
-			gotOrigin := w.Header().Get(cors.HeaderACAO)
-			if testCase.expectedACAOrigin != gotOrigin {
-				t.Errorf("expected origin '%s' but got '%s'", testCase.expectedACAOrigin, gotOrigin)
+			expectedAC := map[string]string{
+				cors.HeaderACAO: testCase.expectedACAOrigin,
+				cors.HeaderACAH: testCase.expectedACAHeaders,
+				cors.HeaderACAM: testCase.expectedACAMethods,
 			}
 
-			gotHeaders := w.Header().Get(cors.HeaderACAH)
-			if testCase.expectedACAHeaders != gotHeaders {
-				t.Errorf("expected header '%s' but got '%s'", testCase.expectedACAHeaders, gotHeaders)
-			}
-
-			gotMethods := w.Header().Get(cors.HeaderACAM)
-			if testCase.expectedACAMethods != gotMethods {
-				t.Errorf("expected methods '%s' but got '%s'", testCase.expectedACAMethods, gotMethods)
-			}
-
-			gotMaxAge := w.Header().Get(cors.HeaderACMA)
-			if testCase.expectedACAMaxAge != gotMaxAge {
-				t.Errorf("expected max age '%s' but got '%s'", testCase.expectedACAMaxAge, gotMaxAge)
-			}
-
-			// check body
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatalf("failed to read body: %s", err)
-			}
+			assertAccessControlHeaders(t, w.Header(), expectedAC)
+			assertBody(t, resp.Body, testCase.expectedBody)
 
 			if err = resp.Body.Close(); err != nil {
 				t.Fatalf("failed to close body: %s", err)
-			}
-
-			if testCase.expectedBody != string(body) {
-				t.Errorf("expectedf body to be '%s' but got '%s'", testCase.expectedBody, string(body))
 			}
 		})
 	}
