@@ -49,11 +49,12 @@ func (r *requestID) handler(next http.Handler) http.Handler {
 		log := NewLoggerFromContext(ctx, r.Log)
 		log.Infof("Request start: %s - %s", request.Method, request.RequestURI)
 
+		// add request ID to header
+		writer.Header().Set(HeaderRID, GetID(ctx))
+
 		// handle next
 		next.ServeHTTP(writer, request)
 
-		// add request ID to header
-		writer.Header().Set(HeaderRID, GetID(ctx))
 		log.Infof("Request finished: %s - %s", request.Method, request.RequestURI)
 	})
 }
