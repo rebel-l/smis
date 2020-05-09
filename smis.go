@@ -160,7 +160,9 @@ func (s *Service) ListenAndServe() error {
 	err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
 		methods, err := route.GetMethods()
 		if err != nil {
-			return err
+			// only error that can happen is "mux: route doesn't have methods"
+			// which can be ignored as sub routers has a sub route without methods
+			return nil
 		}
 
 		pathTemplate, err := route.GetPathTemplate()

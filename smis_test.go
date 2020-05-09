@@ -804,7 +804,7 @@ func assertAccessControlHeaders(t *testing.T, header http.Header, expected map[s
 	}
 }
 
-func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
+func TestService_ListenAndServe(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -827,23 +827,6 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 	routeSuccess := serviceSuccess.Router.NewRoute()
 	routeSuccess.Path("/ping").Methods(http.MethodGet)
 
-	// error
-	serverMockError := smis_mock.NewMockServer(ctrl)
-	serverMockError.EXPECT().ListenAndServe().Times(0)
-
-	logMockError := logrus_mock.NewMockFieldLogger(ctrl)
-	logMockError.EXPECT().Infof(gomock.Any(), gomock.Any()).Times(0)
-
-	serviceError, err := NewService(serverMockError, mux.NewRouter(), logMockError)
-	if err != nil {
-		t.Fatalf("failed to create server: %s", err)
-	}
-
-	routeError := serviceError.Router.NewRoute()
-	routeError.Name("health")
-	routeError.Path("/health")
-	routeError.Name("health new") // this causes an error
-
 	// tests
 	testcases := []struct {
 		name    string
@@ -853,11 +836,6 @@ func TestService_ListenAndServe(t *testing.T) { // nolint: funlen
 		{
 			name:    "success",
 			service: serviceSuccess,
-		},
-		{
-			name:    "error",
-			service: serviceError,
-			err:     fmt.Errorf(`mux: route already has name "health", can't set "health new"`),
 		},
 	}
 
@@ -1026,6 +1004,124 @@ func TestService_WithDefaultMiddlewareForPRChain(t *testing.T) { // nolint: funl
 		expectedBody       string
 		request            *http.Request
 	}{
+		{
+			name:               "public",
+			request:            reqPublic,
+			expectedACAOrigin:  origin,
+			expectedACAMethods: "POST,OPTIONS",
+			expectedACAHeaders: "",
+			expectedACAMaxAge:  "86400",
+			expectedBody:       "public",
+		},
+		{
+			name:               "restricted",
+			request:            reqRestricted,
+			expectedACAOrigin:  origin,
+			expectedACAMethods: "POST,OPTIONS",
+			expectedACAHeaders: "",
+			expectedACAMaxAge:  "86400",
+			expectedBody:       "restricted",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			service.Router.ServeHTTP(w, testCase.request)
+			resp := w.Result()
+
+			// check header
+			gotRequestID := w.Header().Get(requestid.HeaderRID)
+			if gotRequestID == "" {
+				t.Error("request ID in header should not be empty")
+			}
+
+			expectedAC := map[string]string{
+				cors.HeaderACAO: testCase.expectedACAOrigin,
+				cors.HeaderACAH: testCase.expectedACAHeaders,
+				cors.HeaderACAM: testCase.expectedACAMethods,
+			}
+
+			assertAccessControlHeaders(t, w.Header(), expectedAC)
+			assertBody(t, resp.Body, testCase.expectedBody)
+
+			if err = resp.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
+			}
+		})
+	}
+}
+
+func TestService_WithDefaultMiddlewareForDefaultAndPRChain(t *testing.T) { // nolint: funlen
+	origin := "http://www.example.com"
+	cfg := cors.Config{
+		AccessControlAllowOrigins: slice.StringSlice{origin},
+	}
+
+	service, err := NewService(&http.Server{}, mux.NewRouter(), logrus.New())
+	if err != nil {
+		t.Errorf("expect no error but got: %s", err)
+	}
+
+	service.WithDefaultMiddleware(cfg)
+
+	_, err = service.RegisterEndpoint(
+		"/default", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+			if _, err = writer.Write([]byte("default")); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	_, err = service.RegisterEndpointToPublicChain(
+		"/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+			if _, err = writer.Write([]byte("public")); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	_, err = service.RegisterEndpointToRestictedChain(
+		"/new", http.MethodPost, func(writer http.ResponseWriter, _ *http.Request) {
+			if _, err = writer.Write([]byte("restricted")); err != nil {
+				t.Fatalf("failed to send response: %s", err)
+			}
+		})
+	if err != nil {
+		t.Errorf("failed to register endpoint: %s", err)
+	}
+
+	reqDefault := httptest.NewRequest(http.MethodPost, "/default", nil)
+	reqDefault.Header.Set(cors.HeaderOrigin, origin)
+
+	reqPublic := httptest.NewRequest(http.MethodPost, "/public/new", nil)
+	reqPublic.Header.Set(cors.HeaderOrigin, origin)
+
+	reqRestricted := httptest.NewRequest(http.MethodPost, "/restricted/new", nil)
+	reqRestricted.Header.Set(cors.HeaderOrigin, origin)
+
+	testCases := []struct {
+		name               string
+		expectedACAOrigin  string
+		expectedACAMethods string
+		expectedACAHeaders string
+		expectedACAMaxAge  string
+		expectedBody       string
+		request            *http.Request
+	}{
+		{
+			name:               "default",
+			request:            reqDefault,
+			expectedACAOrigin:  origin,
+			expectedACAMethods: "POST,OPTIONS",
+			expectedACAHeaders: "",
+			expectedACAMaxAge:  "86400",
+			expectedBody:       "default",
+		},
 		{
 			name:               "public",
 			request:            reqPublic,
