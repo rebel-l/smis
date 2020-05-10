@@ -74,7 +74,7 @@ func (c *cors) handler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Acces not allowed because of wrong origin
+		// Access not allowed because of wrong origin
 		writer.WriteHeader(http.StatusForbidden)
 		_, _ = writer.Write([]byte("access from origin forbidden"))
 	})
