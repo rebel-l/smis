@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/rebel-l/smis.svg?branch=master)](https://travis-ci.org/rebel-l/smis)
+[![Build Status](https://travis-ci.com/rebel-l/smis.svg?branch=master)](https://travis-ci.com/rebel-l/smis)
 [![codecov](https://codecov.io/gh/rebel-l/smis/branch/master/graph/badge.svg)](https://codecov.io/gh/rebel-l/smis)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rebel-l/smis)](https://goreportcard.com/report/github.com/rebel-l/smis)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
