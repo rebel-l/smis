@@ -21,11 +21,11 @@ var (
 
 // Error represents a struct for handling with error response from SMiS.
 type Error struct {
-	StatusCode int
+	StatusCode int    `json:"-"`
 	Code       string `json:"code"`
 	External   string `json:"error"`
-	Internal   string
-	Details    error
+	Internal   string `json:"-"`
+	Details    error  `json:"-"`
 }
 
 // GetInternal returns the internal error with code. If internal error is empty it takes external error.
@@ -43,6 +43,7 @@ func (e Error) GetInternal() string {
 	}
 
 	if e.Code != "" {
+		// TODO: avoid that deep nesting
 		if msg != "" {
 			if internal == "" {
 				msg = e.Code + msg
