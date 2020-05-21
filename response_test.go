@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,7 +79,6 @@ func TestResponse_WriteJSON(t *testing.T) {
 
 func TestResponse_WriteJSON_Error(t *testing.T) {
 	testCases := []struct {
-		// TODO: add a test for Marshal Error (maybe this one should it be)
 		name string
 		log  bool
 	}{
@@ -117,6 +117,69 @@ func TestResponse_WriteJSON_Error(t *testing.T) {
 			contentType := header.Get(smis.HeaderKeyContentType)
 			if contentType != smis.HeaderContentTypeJSON {
 				t.Errorf("expected content type '%s' but got '%s'", smis.HeaderContentTypeJSON, contentType)
+			}
+		})
+	}
+}
+
+func TestResponse_WriteJSON_MarshalError(t *testing.T) {
+	testCases := []struct {
+		name string
+		log  bool
+	}{
+		{
+			name: "with logger",
+			log:  true,
+		},
+		{
+			name: "without logger",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			actual := &smis.Response{}
+
+			logMock := logrus_mock.NewMockFieldLogger(ctrl)
+			if testCase.log {
+				logMock.EXPECT().Error(gomock.Eq("SMIS-5001 - failed to parse JSON: json: unsupported value: +Inf")).Times(1)
+				actual.Log = logMock
+			} else {
+				logMock.EXPECT().Error(gomock.Any()).Times(0)
+			}
+
+			w := httptest.NewRecorder()
+			actual.WriteJSON(w, 500, math.Inf(1))
+			res := w.Result()
+
+			// Assert Status Code
+			if http.StatusInternalServerError != res.StatusCode {
+				t.Errorf("expected status code %d but got %d", http.StatusContinue, res.StatusCode)
+			}
+
+			// Assert Header
+			header := w.Header().Get(smis.HeaderKeyContentType)
+			if smis.HeaderContentTypeJSON != header {
+				t.Errorf("expected content type '%s' but got '%s'", smis.HeaderContentTypeJSON, header)
+			}
+
+			// Assert Body
+			expected := "{\"code\":\"SMIS-5001\",\"error\":\"a general issue occurred on preparing response\"}"
+
+			body, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				t.Fatalf("failed to read body: %s", err)
+			}
+
+			if expected != string(body) {
+				t.Errorf("expected body to be '%s' but got '%s'", expected, string(body))
+			}
+
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("failed to close body: %s", err)
 			}
 		})
 	}
