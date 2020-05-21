@@ -74,17 +74,7 @@ func (r *Response) WriteJSONError(writer http.ResponseWriter, responseErr Error)
 		)
 	}
 
-	payload, err := json.Marshal(responseErr)
-	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Header().Set(HeaderKeyContentType, HeaderContentTypePlain)
-		_, _ = writer.Write([]byte(responseErr.String()))
-
-		r.logError(fmt.Sprintf("failed to encode response payload: %v", err))
-
-		return
-	}
-
+	payload, _ := json.Marshal(responseErr) // variable is one specific struct and therefor never fail
 	writer.WriteHeader(responseErr.StatusCode)
 	writer.Header().Set(HeaderKeyContentType, HeaderContentTypeJSON)
 	_, _ = writer.Write(payload)
