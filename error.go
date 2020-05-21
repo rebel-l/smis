@@ -43,14 +43,12 @@ func (e Error) GetInternal() string {
 	}
 
 	if e.Code != "" {
-		// TODO: avoid that deep nesting
-		if msg != "" {
-			if internal == "" {
-				msg = e.Code + msg
-			} else {
-				msg = e.Code + separatorAfterCode + msg
-			}
-		} else {
+		switch {
+		case msg != "" && internal == "":
+			msg = e.Code + msg
+		case msg != "" && internal != "":
+			msg = e.Code + separatorAfterCode + msg
+		default:
 			msg = e.Code
 		}
 	}
