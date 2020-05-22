@@ -13,7 +13,7 @@ const (
 	HeaderKeyContentType = "Content-Type"
 
 	// HeaderContentTypeJSON represent the value for content type JSON in the header
-	HeaderContentTypeJSON = "application/json"
+	HeaderContentTypeJSON = "application/json; charset=UTF-8"
 
 	// HeaderContentTypePlain represent the value for content type text/plain in the header
 	HeaderContentTypePlain = "text/plain; charset=utf-8"
