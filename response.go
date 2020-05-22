@@ -14,6 +14,9 @@ const (
 
 	// HeaderContentTypeJSON represent the value for content type JSON in the header
 	HeaderContentTypeJSON = "application/json"
+
+	// HeaderContentTypePlain represent the value for content type text/plain in the header
+	HeaderContentTypePlain = "text/plain; charset=utf-8"
 )
 
 //Response provides functions to write http responses.
@@ -29,6 +32,14 @@ func (r *Response) logError(msg string) {
 	r.Log.Error(msg)
 }
 
+func (r *Response) logWarning(msg string) {
+	if r == nil || r.Log == nil {
+		return
+	}
+
+	r.Log.Warn(msg)
+}
+
 //WriteJSON sends a JSON response with given code and payload.
 func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload interface{}) {
 	if writer == nil {
@@ -40,14 +51,8 @@ func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload inter
 
 	response, err := json.Marshal(payload)
 	if err != nil {
-		msg := errorJSON{Error: fmt.Sprintf("failed to encode response payload: %v", err)}
-		r.logError(msg.Error)
-		writer.WriteHeader(http.StatusInternalServerError)
-
-		response, _ = json.Marshal(msg)
-		if _, err := writer.Write(response); err != nil {
-			r.logError(fmt.Sprintf("failed to write response: %v", err))
-		}
+		se := ErrResponseJSONConversion.WithDetails(err)
+		r.WriteJSONError(writer, se)
 
 		return
 	}
@@ -59,6 +64,20 @@ func (r *Response) WriteJSON(writer http.ResponseWriter, code int, payload inter
 	}
 }
 
-type errorJSON struct {
-	Error string `json:"error"`
+// WriteJSONError generalize sending error responses to client.
+func (r *Response) WriteJSONError(writer http.ResponseWriter, responseErr Error) {
+	if responseErr.StatusCode < http.StatusBadRequest {
+		r.logWarning(
+			fmt.Sprintf(
+				"status code for error response should be of 4xx or 5xx but used %d", responseErr.StatusCode,
+			),
+		)
+	}
+
+	payload, _ := json.Marshal(responseErr) // variable is one specific struct and therefor never fail
+	writer.WriteHeader(responseErr.StatusCode)
+	writer.Header().Set(HeaderKeyContentType, HeaderContentTypeJSON)
+	_, _ = writer.Write(payload)
+
+	r.logError(responseErr.GetInternal())
 }
